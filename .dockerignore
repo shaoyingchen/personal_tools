@@ -1,0 +1,39 @@
+# 隐私和开发文件
+.git/
+.gitignore
+*.log
+.env
+.env.local
+.DS_Store
+Thumbs.db
+
+# 开发工具
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# 备份文件
+backup*/
+*.bak
+*.backup
+
+# 数据文件（运行时创建）
+data/*.sqlite3
+data/*.db
+data/*.sqlite
+
+# 临时文件
+tmp/
+temp/
+*.tmp
