@@ -1,0 +1,492 @@
+{% extends 'layout.html' %}
+{% block title %}{{ t('设置') }} - {{ t('Prompt 管理器') }}{% endblock %}
+{% block content %}
+  <div class="back-line">
+    <a href="{{ url_for('index') }}" class="btn ghost back-btn" onclick="if (window.history.length > 1) { history.back(); return false; }">
+      <i class="fas fa-arrow-left"></i>
+      {{ t('返回') }}
+    </a>
+  </div>
+  <div class="page-header">
+    <h1 class="page-title">
+      <i class="fas fa-cog"></i>
+      {{ t('系统设置') }}
+    </h1>
+    <p class="page-subtitle">{{ t('管理您的提示词库配置') }}</p>
+  </div>
+
+  <div class="settings-container">
+
+    <form method="post" enctype="multipart/form-data" class="settings-form">
+      <div class="settings-section">
+        <div class="section-header">
+          <i class="fas fa-language"></i>
+          <h3>{{ t('语言') }}</h3>
+        </div>
+        <div class="section-content">
+          <div class="form-group">
+            <label style="display:block; font-weight:600; margin-bottom:8px;">{{ t('系统语言') }}</label>
+            <div class="auth-mode-group">
+              <label class="auth-option">
+                <input type="radio" name="language" value="zh" {% if language=='zh' %}checked{% endif %} />
+                <span class="chip"><i class="fas fa-font"></i> {{ t('中文') }}</span>
+              </label>
+              <label class="auth-option">
+                <input type="radio" name="language" value="en" {% if language=='en' %}checked{% endif %} />
+                <span class="chip"><i class="fas fa-font"></i> {{ t('英文') }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <div class="settings-section">
+        <div class="section-header">
+          <i class="fas fa-broom"></i>
+          <h3>{{ t('版本历史清理') }}</h3>
+        </div>
+        <div class="section-content">
+          <p class="help-text">
+            <i class="fas fa-info-circle"></i>
+            {{ t('每个提示词仅保留最近 N 个版本，超出将自动清理（默认 200）。') }}
+          </p>
+          <div class="form-group">
+            <label>
+              <i class="fas fa-hashtag"></i>
+              {{ t('清理阈值 N') }}
+              <div class="input-wrapper">
+                <input type="number" name="version_cleanup_threshold" min="1" value="{{ threshold }}" />
+                <span class="input-suffix">{{ t('个版本') }}</span>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <div class="settings-section">
+        <div class="section-header">
+          <i class="fas fa-lock"></i>
+          <h3>{{ t('访问密码') }}</h3>
+        </div>
+        <div class="section-content">
+          <p class="help-text">
+            <i class="fas fa-info-circle"></i>
+            {{ t('三选一：关闭（不需要密码）、指定提示词密码（仅对勾选了“需要密码”的提示词生效）、全局密码（访问本站任意页面需要密码）。') }}
+          </p>
+          <div class="form-group">
+            <label style="display:block; font-weight:600; margin-bottom:8px;">{{ t('密码模式') }}</label>
+            <div class="auth-mode-group">
+              <label class="auth-option">
+                <input type="radio" name="auth_mode" value="off" {% if auth_mode=='off' %}checked{% endif %} />
+                <span class="chip"><i class="fas fa-ban"></i> {{ t('关闭') }}</span>
+              </label>
+              <label class="auth-option">
+                <input type="radio" name="auth_mode" value="per" {% if auth_mode=='per' %}checked{% endif %} />
+                <span class="chip"><i class="fas fa-bullseye"></i> {{ t('指定提示词密码') }}</span>
+              </label>
+              <label class="auth-option">
+                <input type="radio" name="auth_mode" value="global" {% if auth_mode=='global' %}checked{% endif %} />
+                <span class="chip"><i class="fas fa-globe"></i> {{ t('全局密码') }}</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="new_password">
+              <i class="fas fa-key"></i>
+              {{ t('设置/修改密码（4-8 位）') }}
+            </label>
+            <div class="auth-fields">
+              {% if has_password %}
+              <input type="password" name="current_password" placeholder="{{ t('当前密码（已设置时必填）') }}" />
+              {% endif %}
+              <input type="password" name="new_password" id="new_password" placeholder="{{ t('新密码（留空则不修改）') }}" />
+              <input type="password" name="confirm_password" placeholder="{{ t('确认新密码') }}" />
+            </div>
+            <div class="input-help">
+              {% if has_password %}
+              {{ t('已设置密码：修改密码或切换密码模式需先验证当前密码。') }}
+              {% else %}
+              {{ t('如从未设置过密码，请先设置后再开启对应模式。') }}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <div class="settings-section">
+        <div class="section-header">
+          <i class="fas fa-exchange-alt"></i>
+          <h3>{{ t('数据导入 / 导出') }}</h3>
+        </div>
+        <div class="section-content">
+          <div class="import-export-grid">
+            <div class="export-section">
+              <div class="action-header">
+                <i class="fas fa-download"></i>
+                <h4>{{ t('导出数据') }}</h4>
+              </div>
+              <p class="action-description">
+                {{ t('将所有提示词和版本历史导出为 JSON 格式文件') }}
+              </p>
+              <a href="{{ url_for('export_all') }}" class="btn primary export-btn">
+                <i class="fas fa-file-export"></i>
+                {{ t('导出全部数据') }}
+              </a>
+            </div>
+            
+            <div class="import-section">
+              <div class="action-header">
+                <i class="fas fa-upload"></i>
+                <h4>{{ t('导入数据') }}</h4>
+              </div>
+              <p class="action-description warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                {{ t('导入将覆盖所有现有数据，请谨慎操作') }}
+              </p>
+              <label class="upload-btn">
+                <i class="fas fa-file-import"></i>
+                {{ t('选择 JSON 文件') }}
+                <input type="file" name="import_file" accept="application/json" />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn primary" type="submit">
+          <i class="fas fa-save"></i>
+          {{ t('保存设置 / 执行导入') }}
+        </button>
+        <a href="{{ url_for('index') }}" class="btn ghost">
+          <i class="fas fa-times"></i>
+          {{ t('取消') }}
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <style>
+    .back-line {
+      max-width: 800px;
+      margin: 0 auto var(--spacing-lg);
+      display: flex;
+      justify-content: flex-start;
+    }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+    }
+
+    .page-header {
+      text-align: center;
+      margin-bottom: var(--spacing-3xl);
+      animation: fadeInUp 0.6s ease-out;
+    }
+    
+    .page-title {
+      font-size: var(--font-size-3xl);
+      font-weight: 700;
+      color: var(--primary);
+      margin: 0 0 var(--spacing-sm) 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-sm);
+    }
+    
+    .page-subtitle {
+      font-size: var(--font-size-lg);
+      color: var(--muted);
+      margin: 0;
+    }
+    
+    .settings-container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .settings-form {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 0;
+      overflow: hidden;
+    }
+    
+    .settings-section {
+      padding: var(--spacing-xl) var(--spacing-2xl);
+    }
+    
+    .settings-section:last-child {
+      padding-bottom: var(--spacing-2xl);
+    }
+    
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .section-header i {
+      font-size: var(--font-size-xl);
+      color: var(--primary);
+    }
+    
+    .section-header h3 {
+      font-size: var(--font-size-xl);
+      font-weight: 600;
+      color: var(--fg);
+      margin: 0;
+    }
+    
+    .help-text {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--spacing-sm);
+      color: var(--muted);
+      font-size: var(--font-size-sm);
+      line-height: 1.6;
+      margin-bottom: var(--spacing-lg);
+      padding: var(--spacing-md);
+      background: color-mix(in srgb, var(--primary) 5%, transparent);
+      border-radius: var(--radius-md);
+      border-left: 3px solid var(--primary);
+    }
+    
+    .help-text i {
+      margin-top: 2px;
+      opacity: 0.7;
+    }
+    
+    .form-group {
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .form-group label {
+      font-weight: 500;
+      color: var(--fg);
+      font-size: var(--font-size-base);
+      margin-bottom: var(--spacing-sm);
+    }
+    
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    
+    .input-wrapper input {
+      flex: 1;
+      padding-right: 80px;
+    }
+    
+    .input-suffix {
+      position: absolute;
+      right: var(--spacing-md);
+      color: var(--muted);
+      font-size: var(--font-size-sm);
+      pointer-events: none;
+    }
+    
+    .settings-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0 var(--spacing-2xl);
+    }
+    
+    .import-export-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: var(--spacing-xl);
+    }
+    
+    .export-section, .import-section {
+      padding: var(--spacing-lg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--bg);
+      transition: all 0.3s ease;
+    }
+    
+    .export-section:hover, .import-section:hover {
+      border-color: var(--primary);
+      box-shadow: 0 4px 12px var(--shadow);
+    }
+    
+    .action-header {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-md);
+    }
+    
+    .action-header i {
+      font-size: var(--font-size-lg);
+      color: var(--primary);
+    }
+    
+    .action-header h4 {
+      font-size: var(--font-size-base);
+      font-weight: 600;
+      color: var(--fg);
+      margin: 0;
+    }
+    
+    .action-description {
+      color: var(--muted);
+      font-size: var(--font-size-sm);
+      line-height: 1.5;
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .action-description.warning {
+      color: var(--del);
+      display: flex;
+      align-items: flex-start;
+      gap: var(--spacing-xs);
+    }
+    
+    .action-description.warning i {
+      color: var(--del);
+      margin-top: 2px;
+    }
+    
+    .export-btn {
+      width: 100%;
+      justify-content: center;
+    }
+    
+    .upload-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      padding: var(--spacing-sm) var(--spacing-lg);
+      background: var(--card);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-lg);
+      color: var(--fg);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 500;
+      text-align: center;
+      width: 100%;
+      justify-content: center;
+    }
+    
+    .upload-btn:hover {
+      border-color: var(--primary);
+      background: color-mix(in srgb, var(--primary) 10%, transparent);
+    }
+    
+    .upload-btn input[type="file"] {
+      display: none;
+    }
+    
+    /* Auth section styles */
+    .auth-mode-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-md);
+      margin-top: var(--spacing-sm);
+      margin-bottom: var(--spacing-md);
+    }
+    .auth-option {
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .auth-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .auth-option .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      padding: var(--spacing-sm) var(--spacing-lg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--bg);
+      color: var(--fg);
+      transition: all 0.2s ease;
+    }
+    .auth-option .chip:hover {
+      border-color: var(--primary);
+      box-shadow: 0 2px 10px var(--shadow);
+      transform: translateY(-1px);
+    }
+    .auth-option input[type="radio"]:focus + .chip {
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+    }
+    .auth-option input[type="radio"]:checked + .chip {
+      background: var(--fg);
+      color: var(--bg);
+      border-color: var(--fg);
+    }
+    
+    .auth-fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: var(--spacing-md);
+      margin-top: var(--spacing-md);
+      margin-bottom: var(--spacing-md);
+    }
+    .input-help {
+      font-size: var(--font-size-sm);
+      color: var(--muted);
+      margin-top: var(--spacing-md);
+      line-height: 1.5;
+    }
+    
+    .form-actions {
+      display: flex;
+      gap: var(--spacing-md);
+      justify-content: flex-end;
+      padding: var(--spacing-xl) var(--spacing-2xl);
+      background: color-mix(in srgb, var(--card) 50%, transparent);
+      border-top: 1px solid var(--border);
+    }
+    
+    @media (max-width: 768px) {
+      .page-header {
+        margin-bottom: var(--spacing-2xl);
+      }
+      
+      .page-title {
+        font-size: var(--font-size-2xl);
+      }
+      
+      .settings-section {
+        padding: var(--spacing-lg);
+      }
+      
+      .import-export-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-lg);
+      }
+      
+      .form-actions {
+        flex-direction: column;
+      }
+      
+      .form-actions .btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  </style>
+{% endblock %}

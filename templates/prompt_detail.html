@@ -1,0 +1,1097 @@
+{% extends 'layout.html' %}
+{% block title %}{{ t('详情') }} - {{ t('Prompt 管理器') }}{% endblock %}
+{% block content %}
+  <div class="page-header">
+    <h1 class="page-title">
+      <i class="fas fa-edit"></i>
+      {% if prompt %}
+        {{ prompt['name'] }}
+      {% else %}
+        {{ t('提示词编辑') }}
+      {% endif %}
+    </h1>
+  </div>
+
+  <div class="prompt-editor-container">
+    <div class="breadcrumb-nav">
+      <a class="btn ghost" href="{{ url_for('index') }}">
+        <i class="fas fa-arrow-left"></i> {{ t('返回列表') }}
+      </a>
+      {% if prompt %}
+        <a class="btn ghost" href="{{ url_for('versions_page', prompt_id=prompt['id']) }}">
+          <i class="fas fa-history"></i> {{ t('历史版本') }}
+        </a>
+        <button type="button" class="btn primary" onclick="openOptimizeModal()">
+          <i class="fas fa-magic"></i> AI 优化
+        </button>
+      {% endif %}
+    </div>
+
+    <form method="post" class="prompt-form">
+      <div class="form-sections">
+        <!-- Basic Information Section -->
+        <div class="form-section primary-section">
+          <div class="section-header">
+            <i class="fas fa-info-circle"></i>
+            <h3>{{ t('基本信息') }}</h3>
+          </div>
+          <div class="section-content">
+            <div class="form-group">
+              <label for="name">
+                <i class="fas fa-heading"></i>
+                {{ t('提示词名称') }}
+                <span class="required">*</span>
+              </label>
+              <input type="text" id="name" name="name" value="{{ (prompt and prompt['name']) or '' }}" 
+                     placeholder="{{ t('输入提示词的名称') }}" required />
+              </div>
+
+            <div class="form-group">
+              <label for="content">
+                <i class="fas fa-file-alt"></i>
+                {{ t('提示词内容') }}
+                <span class="required">*</span>
+              </label>
+              <div class="textarea-wrapper">
+                <textarea id="content" name="content" rows="16" 
+                          placeholder="{{ t('在此输入提示词的完整内容...') }}">{{ (current and current['content']) or '' }}</textarea>
+                <div class="textarea-footer">
+                  <div class="char-counter">0 {{ t('字符') }}</div>
+                  <div class="textarea-actions">
+                    <button type="button" class="icon-btn" id="copyBtn" title="{{ t('复制内容') }}">
+                      <i class="fas fa-copy"></i>
+                    </button>
+                    <button type="button" class="icon-btn" id="resizeBtn" title="{{ t('自动调整大小') }}">
+                      <i class="fas fa-expand-alt"></i>
+                    </button>
+                    <button type="button" class="icon-btn" id="clearBtn" title="{{ t('清空内容') }}">
+                      <i class="fas fa-eraser"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Version Control Section -->
+        <div class="form-section">
+          <div class="section-header collapsible" onclick="toggleSection(this)">
+            <i class="fas fa-cog"></i>
+            <h3>{{ t('高级设置') }}</h3>
+            <i class="fas fa-chevron-down section-toggle"></i>
+          </div>
+          <div class="section-content">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="source">
+                  <i class="fas fa-link"></i>
+                  {{ t('来源') }}
+                </label>
+                <input type="text" id="source" name="source" value="{{ (prompt and prompt['source']) or '' }}" 
+                       placeholder="{{ t('提示词来源') }}" />
+                </div>
+
+              <div class="form-group">
+                <label for="tags">
+                  <i class="fas fa-tags"></i>
+                  {{ t('标签') }}
+                </label>
+                <div class="tags-input-wrapper">
+                  <input type="text" id="tags" name="tags" 
+                         value="{% if prompt and prompt['tags'] %}{{ (prompt['tags']|loads)|join(', ') }}{% endif %}" 
+                         placeholder="{{ t('标签，用逗号分隔') }}" />
+                  </div>
+              </div>
+
+              <div class="form-group">
+                <label for="color">
+                  <i class="fas fa-palette"></i>
+                  {{ t('颜色') }}
+                </label>
+                <div class="color-input">
+                  <div class="color-input-row">
+                    <div class="color-swatch-wrap">
+                      <span class="color-swatch" id="colorSwatch" title="{{ t('选择颜色') }}" role="button" tabindex="0" aria-label="{{ t('选择颜色') }}"></span>
+                      <input type="color" id="colorPicker" aria-label="{{ t('选择颜色') }}"
+                             value="{{ (prompt and prompt['color']) or '#409eff' }}" />
+                    </div>
+                    <input type="text" id="color" name="color" value="{{ (prompt and prompt['color']) or '' }}" 
+                           placeholder="{{ t('例如 #409eff，留空不设置') }}" />
+                    <button type="button" class="icon-btn" id="colorClearBtn" title="{{ t('清除颜色') }}">
+                      <i class="fas fa-eraser"></i>
+                    </button>
+                  </div>
+                  <div class="input-help">{{ t('用于首页卡片边框的细微彩色外圈。留空则不设置。') }}</div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="notes">
+                  <i class="fas fa-sticky-note"></i>
+                  {{ t('备注') }}
+                </label>
+                <input type="text" id="notes" name="notes" value="{{ (prompt and prompt['notes']) or '' }}" 
+                       placeholder="{{ t('补充说明或使用注意事项') }}" />
+                  </div>
+            </div>
+
+            <div class="form-group" style="margin-top: var(--spacing-md);">
+              <label class="checkbox-label">
+                <input type="checkbox" name="require_password" value="1"
+                       {% if prompt and prompt['require_password'] %}checked{% endif %}
+                       {% if auth_mode != 'per' %}disabled{% endif %} />
+                <span class="checkbox-custom"></span>
+                <span class="checkbox-text">
+                  <i class="fas fa-lock"></i>
+                  {{ t('该提示词需要密码访问') }}
+                </span>
+              </label>
+              {% if auth_mode == 'global' %}
+                <div class="input-help">{{ t('已开启全局密码，单个提示词的密码设置不再生效。') }}</div>
+              {% elif auth_mode == 'off' %}
+                <div class="input-help">{{ t('当前未启用“指定提示词密码”模式，本项暂不生效。') }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form Actions -->
+      <div class="form-actions">
+        <div class="actions-main">
+          <button type="submit" class="btn primary">
+            <i class="fas fa-check"></i>
+            {% if prompt %}
+              {{ t('保存修改') }}
+            {% else %}
+              {{ t('创建提示词') }}
+            {% endif %}
+          </button>
+
+          {% if prompt %}
+          <button type="button" class="btn secondary" onclick="showOptimizeModal()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white;">
+            <i class="fas fa-magic"></i> AI 优化
+          </button>
+          {% endif %}
+
+          <a href="{{ url_for('index') }}" class="btn ghost">
+            <i class="fas fa-arrow-left"></i>
+            {{ t('返回列表') }}
+          </a>
+          {% if prompt %}
+            <button type="button" class="btn ghost" onclick="triggerDelete()" style="border-color: var(--del); color: var(--del);">
+              <i class="fas fa-trash"></i>
+              {{ t('删除提示词') }}
+            </button>
+          {% endif %}
+        </div>
+        
+        <div class="actions-version">
+          <div class="version-checkbox">
+            <label class="checkbox-label">
+              <input type="checkbox" name="do_save_version" value="1" checked />
+              <span class="checkbox-custom"></span>
+              <span class="checkbox-text">
+                <i class="fas fa-save"></i>
+                {{ t('保存为新版本') }}
+              </span>
+            </label>
+          </div>
+          
+          <div class="version-select-wrapper">
+            <select id="bump_kind" name="bump_kind" class="version-select">
+              <option value="patch" selected>
+                {{ t('补丁版本 (+0.0.1)') }}
+              </option>
+              <option value="minor">
+                {{ t('次版本 (+0.1.0)') }}
+              </option>
+              <option value="major">
+                {{ t('主版本 (+1.0.0)') }}
+              </option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- AI Optimization Modal -->
+  <div id="optimizeModal" class="modal">
+    <div class="modal-content large">
+      <div class="modal-header">
+        <h3>🤖 AI 提示词优化</h3>
+        <button class="modal-close" onclick="closeOptimizeModal()">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="optimize-container">
+          <div class="section">
+            <h4>🎯 优化设置</h4>
+
+            <div class="form-group">
+              <label>AI 配置:</label>
+              <select id="aiConfigSelect" class="form-control">
+                <option value="">加载中...</option>
+              </select>
+              <button type="button" class="btn small secondary" onclick="refreshAIConfigs()">
+                <i class="fas fa-sync"></i> 刷新
+              </button>
+            </div>
+
+            <div class="form-group">
+              <label>优化要求:</label>
+              <textarea id="optimizationPrompt" class="form-control" rows="4" placeholder="请描述你希望如何优化这个提示词，例如：&#10;- 让提示词更加简洁明了&#10;- 增加更多上下文信息&#10;- 优化输出格式&#10;- 提高响应质量">请优化这个提示词，使其更加有效和清晰。</textarea>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn primary" onclick="startOptimization()">
+                <i class="fas fa-magic"></i> 开始优化
+              </button>
+              <button type="button" class="btn ghost" onclick="closeOptimizeModal()">取消</button>
+            </div>
+          </div>
+
+          <div class="section" id="optimizationProgress" style="display: none;">
+            <h4>⏳ 优化进度</h4>
+            <div class="progress-container">
+              <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+              </div>
+              <p class="progress-text" id="progressText">正在分析提示词...</p>
+            </div>
+          </div>
+
+          <div class="section" id="optimizationResult" style="display: none;">
+            <h4>✨ 优化结果</h4>
+
+            <div class="result-tabs">
+              <button class="tab-btn active" onclick="switchResultTab('optimized')">
+                优化后的版本
+              </button>
+              <button class="tab-btn" onclick="switchResultTab('comparison')">
+                对比视图
+              </button>
+            </div>
+
+            <div class="tab-content" id="optimizedTab">
+              <div class="result-header">
+                <span class="success-badge">优化完成</span>
+                <small id="optimizationTime"></small>
+              </div>
+              <div class="result-content">
+                <textarea id="optimizedContent" class="form-control" rows="15" readonly></textarea>
+              </div>
+              <div class="result-actions">
+                <button type="button" class="btn primary" onclick="applyOptimizedContent()">
+                  <i class="fas fa-check"></i> 应用此版本
+                </button>
+                <button type="button" class="btn secondary" onclick="copyOptimizedContent()">
+                  <i class="fas fa-copy"></i> 复制内容
+                </button>
+                <button type="button" class="btn ghost" onclick="createNewOptimization()">
+                  <i class="fas fa-redo"></i> 重新优化
+                </button>
+              </div>
+            </div>
+
+            <div class="tab-content" id="comparisonTab" style="display: none;">
+              <div class="comparison-container">
+                <div class="comparison-side">
+                  <h5>原始版本</h5>
+                  <div class="content-box" id="originalContent"></div>
+                </div>
+                <div class="comparison-side">
+                  <h5>优化版本</h5>
+                  <div class="content-box" id="optimizedComparison"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview Modal -->
+  <div id="previewModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fas fa-eye"></i> {{ t('提示词预览') }}</h3>
+        <button class="modal-close" onclick="closePreview()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="preview-content">
+          <h4 id="previewName"></h4>
+          <div id="previewText"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if prompt %}
+  <!-- Hidden delete form (separate from edit form to avoid nested forms) -->
+  <form id="deleteForm" method="post" action="{{ url_for('delete_prompt', prompt_id=prompt['id']) }}"></form>
+  {% endif %}
+
+
+  <script>
+    // i18n strings for this page
+    const I18N = {
+      SAVE_PROCESSING: {{ t('保存中...')|tojson }},
+      CONFIRM_DELETE: {{ t('确定要删除该提示词及其所有版本吗？此操作不可恢复。')|tojson }},
+      CHAR: {{ t('字符')|tojson }},
+      ENTER_NAME: {{ t('请输入提示词名称')|tojson }},
+      ENTER_CONTENT: {{ t('请输入提示词内容')|tojson }},
+      UNTITLED: {{ t('未命名提示词')|tojson }},
+      NO_CONTENT: {{ t('无内容')|tojson }},
+      AUTOSIZE_ON: {{ t('已开启自动调整大小')|tojson }},
+      AUTOSIZE_OFF: {{ t('自动调整大小')|tojson }},
+      NO_COPY_SOURCE: {{ t('没有内容可复制')|tojson }},
+      COPY_FAIL: {{ t('复制失败，请手动选择文本复制')|tojson }},
+      CLEAR_CONFIRM: {{ t('确定要清空内容吗？此操作不可撤销。')|tojson }}
+    };
+    // Auto-resize toggle state (default: off)
+    let autoResizeEnabled = false;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Initialize form interactions
+      initializeForm();
+      
+      // Textarea setup (no auto-resize by default)
+      const textarea = document.getElementById('content');
+      if (textarea) {
+        updateCharCounter(textarea);
+        
+        textarea.addEventListener('input', () => {
+          if (autoResizeEnabled) {
+            autoResizeTextarea(textarea);
+          }
+          updateCharCounter(textarea);
+        });
+      }
+      
+      // Setup tag autocomplete
+      setupTagAutocomplete();
+      
+      // Initialize collapsible sections
+      initializeCollapsibleSections();
+    });
+    
+    function initializeForm() {
+      const form = document.querySelector('.prompt-form');
+      const submitBtn = form.querySelector('button[type="submit"]');
+      
+      // Store original button text
+      submitBtn.dataset.originalText = submitBtn.textContent.trim();
+      
+      // Form submission handler
+      form.addEventListener('submit', (e) => {
+        if (!validateForm()) {
+          e.preventDefault();
+          return;
+        }
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="loading"></span> ' + I18N.SAVE_PROCESSING;
+        
+        // Re-enable after 5 seconds (fallback)
+        setTimeout(() => {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = submitBtn.dataset.originalText;
+        }, 5000);
+      });
+    }
+
+    // 删除确认：仅一次确认
+    function confirmDelete() {
+      return confirm(I18N.CONFIRM_DELETE);
+    }
+
+    function triggerDelete() {
+      if (confirmDelete()) {
+        const f = document.getElementById('deleteForm');
+        if (f) f.submit();
+      }
+    }
+    
+    function autoResizeTextarea(textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.max(200, textarea.scrollHeight) + 'px';
+    }
+    
+    function updateCharCounter(textarea) {
+      const counter = document.querySelector('.char-counter');
+      if (counter) {
+        const length = textarea.value.length;
+        counter.textContent = `${length} ` + I18N.CHAR;
+        
+        // Change color based on length
+        if (length > 2000) {
+          counter.style.color = 'var(--del)';
+        } else if (length > 1000) {
+          counter.style.color = 'var(--ins)';
+        } else {
+          counter.style.color = 'var(--muted)';
+        }
+      }
+    }
+    
+    function setupTagAutocomplete() {
+      const tagsInput = document.getElementById('tags');
+      if (!tagsInput) return;
+      
+      let suggestions = [];
+      
+      // Fetch tag suggestions
+      fetch('/api/tags')
+        .then(r => r.json())
+        .then(list => {
+          suggestions = list;
+          createAutocompleteDropdown(tagsInput, suggestions);
+        })
+        .catch(() => {});
+    }
+    
+    function createAutocompleteDropdown(input, suggestions) {
+      const dropdown = document.createElement('div');
+      dropdown.className = 'tag-suggestions';
+      dropdown.style.cssText = `
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 100;
+        display: none;
+        box-shadow: 0 4px 16px var(--shadow);
+      `;
+      
+      input.parentNode.style.position = 'relative';
+      input.parentNode.appendChild(dropdown);
+      
+      // Show/hide dropdown
+      input.addEventListener('focus', () => showSuggestions(input, dropdown, suggestions));
+      input.addEventListener('input', () => showSuggestions(input, dropdown, suggestions));
+      input.addEventListener('blur', () => {
+        setTimeout(() => dropdown.style.display = 'none', 200);
+      });
+    }
+    
+    function showSuggestions(input, dropdown, suggestions) {
+      const val = input.value;
+      const parts = val.replace(/，/g, ',').split(',');
+      const lastPart = parts[parts.length - 1] || '';
+      const lastTag = lastPart.trim();
+      
+      if (lastTag.length >= 1) {
+        const matches = suggestions.filter(tag => 
+          tag.toLowerCase().includes(lastTag.toLowerCase())
+        ).slice(0, 5);
+        
+        if (matches.length > 0) {
+          dropdown.innerHTML = matches.map(tag => 
+            `<div class="tag-suggestion" style="padding: 8px 12px; cursor: pointer; transition: background 0.2s ease;" data-tag="${tag}">
+              ${highlightMatch(tag, lastTag)}
+            </div>`
+          ).join('');
+          
+          dropdown.style.display = 'block';
+          
+          // Add click handlers
+          dropdown.querySelectorAll('.tag-suggestion').forEach(item => {
+            item.addEventListener('click', () => {
+              const tag = item.dataset.tag;
+              parts[parts.length - 1] = tag;
+              input.value = parts.join(', ') + ', ';
+              input.focus();
+              dropdown.style.display = 'none';
+            });
+            
+            item.addEventListener('mouseenter', () => {
+              item.style.background = 'color-mix(in srgb, var(--primary) 10%, transparent)';
+            });
+            
+            item.addEventListener('mouseleave', () => {
+              item.style.background = '';
+            });
+          });
+        } else {
+          dropdown.style.display = 'none';
+        }
+      } else {
+        dropdown.style.display = 'none';
+      }
+    }
+    
+    function highlightMatch(tag, search) {
+      if (!search) return tag;
+      const regex = new RegExp(`(${search})`, 'gi');
+      return tag.replace(regex, '<strong style="color: var(--primary);">$1</strong>');
+    }
+    
+    function initializeCollapsibleSections() {
+      const collapsibles = document.querySelectorAll('.collapsible');
+      collapsibles.forEach(collapsible => {
+        // Start with collapsed state for non-primary sections
+        if (!collapsible.closest('.primary-section')) {
+          collapsible.classList.add('active');
+          const content = collapsible.nextElementSibling;
+          content.style.display = 'block';
+        }
+      });
+    }
+    
+    function toggleSection(header) {
+      header.classList.toggle('active');
+      const content = header.nextElementSibling;
+      
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        content.style.animation = 'fadeInUp 0.3s ease-out';
+      } else {
+        content.style.display = 'none';
+      }
+    }
+    
+    function validateForm() {
+      const nameInput = document.getElementById('name');
+      const contentInput = document.getElementById('content');
+      
+      let isValid = true;
+      
+      // Validate name
+      if (!nameInput.value.trim()) {
+        showFieldError(nameInput, I18N.ENTER_NAME);
+        isValid = false;
+      } else {
+        clearFieldError(nameInput);
+      }
+      
+      // Validate content
+      if (!contentInput.value.trim()) {
+        showFieldError(contentInput, I18N.ENTER_CONTENT);
+        isValid = false;
+      } else {
+        clearFieldError(contentInput);
+      }
+      
+      return isValid;
+    }
+    
+    function showFieldError(field, message) {
+      field.style.borderColor = 'var(--del)';
+      field.style.animation = 'shake 0.5s ease-in-out';
+      
+      // Show error message
+      let errorDiv = field.parentNode.querySelector('.field-error');
+      if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.className = 'field-error';
+        errorDiv.style.cssText = `
+          color: var(--del);
+          font-size: 12px;
+          margin-top: 4px;
+          font-weight: 500;
+        `;
+        field.parentNode.appendChild(errorDiv);
+      }
+      errorDiv.textContent = message;
+      
+      setTimeout(() => {
+        field.style.animation = '';
+      }, 500);
+    }
+    
+    function clearFieldError(field) {
+      field.style.borderColor = '';
+      const errorDiv = field.parentNode.querySelector('.field-error');
+      if (errorDiv) {
+        errorDiv.remove();
+      }
+    }
+    
+    function previewPrompt() {
+      const name = document.getElementById('name').value || I18N.UNTITLED;
+      const content = document.getElementById('content').value || I18N.NO_CONTENT;
+      
+      document.getElementById('previewName').textContent = name;
+      document.getElementById('previewText').textContent = content;
+      document.getElementById('previewModal').style.display = 'block';
+    }
+    
+    function closePreview() {
+      document.getElementById('previewModal').style.display = 'none';
+    }
+    
+    // Add shake animation
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+      }
+      
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    // Close modal when clicking outside
+    window.addEventListener('click', (e) => {
+      const modal = document.getElementById('previewModal');
+      if (e.target === modal) {
+        closePreview();
+      }
+    });
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Ctrl/Cmd + S to save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        document.querySelector('.prompt-form').dispatchEvent(new Event('submit'));
+      }
+      
+      // Ctrl/Cmd + P to preview
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault();
+        previewPrompt();
+      }
+      
+      // Escape to close modal
+      if (e.key === 'Escape') {
+        closePreview();
+      }
+    });
+    
+    // Button actions
+    document.getElementById('resizeBtn')?.addEventListener('click', () => {
+      const textarea = document.getElementById('content');
+      autoResizeEnabled = !autoResizeEnabled;
+      if (autoResizeEnabled) {
+        autoResizeTextarea(textarea);
+        document.getElementById('resizeBtn').title = I18N.AUTOSIZE_ON;
+      } else {
+        textarea.style.height = '';
+        document.getElementById('resizeBtn').title = I18N.AUTOSIZE_OFF;
+      }
+    });
+    
+    document.getElementById('copyBtn')?.addEventListener('click', async () => {
+      const textarea = document.getElementById('content');
+      const content = textarea.value.trim();
+      
+      if (!content) {
+        showFieldError(textarea, I18N.NO_COPY_SOURCE);
+        return;
+      }
+      
+      // Check if clipboard API is available
+      if (!navigator.clipboard) {
+        // Fallback to traditional method
+        fallbackCopyTextToClipboard(content);
+        return;
+      }
+      
+      try {
+        await navigator.clipboard.writeText(content);
+        
+        // Show success feedback
+        const btn = document.getElementById('copyBtn');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i>';
+        btn.style.background = 'var(--ins)';
+        btn.style.color = 'var(--text-on-success)';
+        
+        setTimeout(() => {
+          btn.innerHTML = originalHTML;
+          btn.style.background = '';
+          btn.style.color = '';
+        }, 2000);
+      } catch (err) {
+        console.error('Clipboard API failed:', err);
+        // Fallback to traditional method
+        fallbackCopyTextToClipboard(content);
+      }
+    });
+    
+    function fallbackCopyTextToClipboard(text) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      
+      // Avoid scrolling to bottom
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.position = "fixed";
+      
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          const btn = document.getElementById('copyBtn');
+          const originalHTML = btn.innerHTML;
+          btn.innerHTML = '<i class="fas fa-check"></i>';
+          btn.style.background = 'var(--ins)';
+          btn.style.color = 'var(--text-on-success)';
+          
+          setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.style.background = '';
+            btn.style.color = '';
+          }, 2000);
+        } else {
+          throw new Error('execCommand failed');
+        }
+      } catch (err) {
+        console.error('Fallback copy failed:', err);
+        alert(I18N.COPY_FAIL);
+      }
+      
+      document.body.removeChild(textArea);
+    }
+    
+    document.getElementById('clearBtn')?.addEventListener('click', () => {
+      if (confirm(I18N.CLEAR_CONFIRM)) {
+        document.getElementById('content').value = '';
+        updateCharCounter(document.getElementById('content'));
+        document.getElementById('content').focus();
+      }
+    });
+
+    // AI 优化功能
+    let currentOptimizationTaskId = null;
+    let optimizationProgressInterval = null;
+
+    // 显示优化模态框
+    function showOptimizeModal() {
+      document.getElementById('optimizeModal').style.display = 'flex';
+      loadAIConfigs();
+      resetOptimizationForm();
+    }
+
+    // 打开优化模态框
+    function openOptimizeModal() {
+      const modal = document.getElementById('optimizeModal');
+      modal.classList.add('show');
+      resetOptimizationForm();
+      loadAIConfigs();
+      // 防止背景滚动
+      document.body.style.overflow = 'hidden';
+    }
+
+    // 关闭优化模态框
+    function closeOptimizeModal() {
+      const modal = document.getElementById('optimizeModal');
+      modal.classList.remove('show');
+      if (optimizationProgressInterval) {
+        clearInterval(optimizationProgressInterval);
+        optimizationProgressInterval = null;
+      }
+      // 恢复背景滚动
+      document.body.style.overflow = '';
+    }
+
+    // 点击背景关闭模态框
+    document.addEventListener('click', function(e) {
+      const modal = document.getElementById('optimizeModal');
+      if (e.target === modal) {
+        closeOptimizeModal();
+      }
+    });
+
+    // ESC键关闭模态框
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('optimizeModal');
+        if (modal.classList.contains('show')) {
+          closeOptimizeModal();
+        }
+      }
+    });
+
+    // 重置优化表单
+    function resetOptimizationForm() {
+      document.getElementById('optimizationProgress').style.display = 'none';
+      document.getElementById('optimizationResult').style.display = 'none';
+      document.getElementById('optimizationPrompt').value = '请优化这个提示词，使其更加有效和清晰。';
+      currentOptimizationTaskId = null;
+    }
+
+    // 加载 AI 配置
+    async function loadAIConfigs() {
+      try {
+        const response = await fetch('/api/ai-configs');
+        const configs = await response.json();
+
+        const select = document.getElementById('aiConfigSelect');
+        select.innerHTML = configs.map(config =>
+          `<option value="${config.id}">${config.name} (${config.provider.toUpperCase()} - ${config.model_name})</option>`
+        ).join('');
+
+        if (configs.length > 0) {
+          select.value = configs[0].id;
+        }
+      } catch (error) {
+        console.error('加载 AI 配置失败:', error);
+        document.getElementById('aiConfigSelect').innerHTML = '<option value="">加载失败</option>';
+      }
+    }
+
+    // 刷新 AI 配置
+    function refreshAIConfigs() {
+      document.getElementById('aiConfigSelect').innerHTML = '<option value="">刷新中...</option>';
+      loadAIConfigs();
+    }
+
+    // 开始优化
+    async function startOptimization() {
+      const configId = document.getElementById('aiConfigSelect').value;
+      const optimizationPrompt = document.getElementById('optimizationPrompt').value;
+
+      if (!configId) {
+        alert('请选择 AI 配置');
+        return;
+      }
+
+      if (!optimizationPrompt.trim()) {
+        alert('请输入优化要求');
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/prompts/{{ prompt.id }}/optimize`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ai_config_id: parseInt(configId),
+            optimization_prompt: optimizationPrompt
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          currentOptimizationTaskId = result.task_id;
+
+          // 显示进度
+          document.getElementById('optimizationProgress').style.display = 'block';
+          document.querySelector('.section:nth-child(1)').style.display = 'none';
+
+          // 开始轮询任务状态
+          startProgressMonitoring();
+        } else {
+          const error = await response.json();
+          alert(error.error || '创建优化任务失败');
+        }
+      } catch (error) {
+        console.error('创建优化任务失败:', error);
+        alert('创建优化任务失败');
+      }
+    }
+
+    // 开始进度监控
+    function startProgressMonitoring() {
+      let progress = 0;
+      const progressSteps = [
+        '正在分析提示词...',
+        '正在发送到 AI 服务...',
+        'AI 正在处理优化请求...',
+        '正在生成优化结果...',
+        '正在保存优化版本...'
+      ];
+
+      optimizationProgressInterval = setInterval(async () => {
+        if (!currentOptimizationTaskId) return;
+
+        try {
+          const response = await fetch(`/api/optimization-tasks/${currentOptimizationTaskId}`);
+          const task = await response.json();
+
+          // 更新进度
+          progress = Math.min(progress + 20, 90);
+          document.getElementById('progressFill').style.width = progress + '%';
+
+          const stepIndex = Math.floor(progress / 20);
+          document.getElementById('progressText').textContent = progressSteps[Math.min(stepIndex, progressSteps.length - 1)];
+
+          if (task.status === 'completed') {
+            // 优化完成
+            clearInterval(optimizationProgressInterval);
+            optimizationProgressInterval = null;
+
+            document.getElementById('progressFill').style.width = '100%';
+            document.getElementById('progressText').textContent = '优化完成！';
+
+            setTimeout(() => {
+              showOptimizationResult(task);
+            }, 1000);
+
+          } else if (task.status === 'failed') {
+            // 优化失败
+            clearInterval(optimizationProgressInterval);
+            optimizationProgressInterval = null;
+
+            alert('优化失败: ' + (task.error_message || '未知错误'));
+            resetOptimizationForm();
+          }
+        } catch (error) {
+          console.error('获取任务状态失败:', error);
+        }
+      }, 2000);
+    }
+
+    // 显示优化结果
+    function showOptimizationResult(task) {
+      document.getElementById('optimizationProgress').style.display = 'none';
+      document.getElementById('optimizationResult').style.display = 'block';
+
+      // 设置优化内容
+      document.getElementById('optimizedContent').value = task.result_content;
+      document.getElementById('optimizedComparison').textContent = task.result_content;
+
+      // 设置原始内容
+      const originalContent = document.getElementById('content').value;
+      document.getElementById('originalContent').textContent = originalContent;
+
+      // 设置时间
+      const now = new Date().toLocaleString();
+      document.getElementById('optimizationTime').textContent = `完成时间: ${now}`;
+    }
+
+    // 切换结果标签
+    function switchResultTab(tab) {
+      const tabs = document.querySelectorAll('.tab-btn');
+      const contents = document.querySelectorAll('.tab-content');
+
+      tabs.forEach(t => t.classList.remove('active'));
+      contents.forEach(c => c.style.display = 'none');
+
+      if (tab === 'optimized') {
+        tabs[0].classList.add('active');
+        document.getElementById('optimizedTab').style.display = 'block';
+      } else {
+        tabs[1].classList.add('active');
+        document.getElementById('comparisonTab').style.display = 'block';
+      }
+    }
+
+    // 应用优化内容
+    async function applyOptimizedContent() {
+      const optimizedContent = document.getElementById('optimizedContent').value;
+
+      if (!currentOptimizationTaskId) {
+        alert('优化任务ID无效');
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/optimization-tasks/${currentOptimizationTaskId}/apply`, {
+          method: 'POST'
+        });
+
+        if (response.ok) {
+          // 应用到编辑器
+          document.getElementById('content').value = optimizedContent;
+          updateCharCounter(document.getElementById('content'));
+
+          // 关闭模态框
+          closeOptimizeModal();
+
+          // 显示成功消息
+          const successMsg = document.createElement('div');
+          successMsg.className = 'alert alert-success';
+          successMsg.textContent = '优化版本已应用，已创建新版本记录！';
+          successMsg.style.position = 'fixed';
+          successMsg.style.top = '20px';
+          successMsg.style.right = '20px';
+          successMsg.style.zIndex = '9999';
+          document.body.appendChild(successMsg);
+
+          setTimeout(() => {
+            successMsg.remove();
+          }, 5000);
+
+          // 刷新页面以显示新版本
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+
+        } else {
+          const error = await response.json();
+          alert(error.error || '应用优化结果失败');
+        }
+      } catch (error) {
+        console.error('应用优化结果失败:', error);
+        alert('应用优化结果失败');
+      }
+    }
+
+    // 复制优化内容
+    function copyOptimizedContent() {
+      const content = document.getElementById('optimizedContent').value;
+
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(content).then(() => {
+          showMessage('内容已复制到剪贴板', 'success');
+        }).catch(() => {
+          fallbackCopy(content);
+        });
+      } else {
+        fallbackCopy(content);
+      }
+    }
+
+    // 备用复制方法
+    function fallbackCopy(content) {
+      const textArea = document.createElement('textarea');
+      textArea.value = content;
+      document.body.appendChild(textArea);
+      textArea.select();
+
+      try {
+        document.execCommand('copy');
+        showMessage('内容已复制到剪贴板', 'success');
+      } catch (err) {
+        showMessage('复制失败', 'error');
+      }
+
+      document.body.removeChild(textArea);
+    }
+
+    // 重新优化
+    function createNewOptimization() {
+      resetOptimizationForm();
+      document.querySelector('.section:nth-child(1)').style.display = 'block';
+    }
+
+    // 显示消息
+    function showMessage(message, type) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `alert alert-${type}`;
+      msgDiv.textContent = message;
+      msgDiv.style.position = 'fixed';
+      msgDiv.style.top = '20px';
+      msgDiv.style.right = '20px';
+      msgDiv.style.zIndex = '9999';
+      document.body.appendChild(msgDiv);
+
+      setTimeout(() => {
+        msgDiv.remove();
+      }, 3000);
+    }
+  </script>
+{% endblock %}

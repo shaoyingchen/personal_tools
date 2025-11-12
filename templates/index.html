@@ -1,0 +1,1162 @@
+{% extends 'layout.html' %}
+{% block title %}{{ t('列表') }} - {{ t('Prompt 管理器') }}{% endblock %}
+{% block content %}
+  <section class="toolbar">
+    <form method="get" action="{{ url_for('index') }}" class="search-form">
+      <div class="search-input-wrapper">
+        <i class="fas fa-search"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="{{ t('搜索（名称/来源/备注/标签/当前内容）') }}" />
+      </div>
+      <div class="search-controls">
+        <select name="sort" title="{{ t('排序') }}" class="sort-select">
+          <option value="updated" {% if sort=='updated' %}selected{% endif %}>{{ t('最近修改') }}</option>
+          <option value="created" {% if sort=='created' %}selected{% endif %}>{{ t('创建时间') }}</option>
+          <option value="name" {% if sort=='name' %}selected{% endif %}>{{ t('名称 A-Z') }}</option>
+          <option value="tags" {% if sort=='tags' %}selected{% endif %}>{{ t('标签') }}</option>
+        </select>
+        <button class="btn search-btn" type="submit">
+          <i class="fas fa-filter"></i> {{ t('应用') }}
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <section class="create-section">
+    <div class="create-actions">
+      <a href="{{ url_for('new_prompt') }}" class="btn primary create-btn">
+        <i class="fas fa-plus"></i> {{ t('新建提示词') }}
+      </a>
+    </div>
+  </section>
+
+  <!-- 桌面端覆盖式侧边栏 + 固定开关按钮（不挤压内容） - 始终渲染，便于空结果时也能操作筛选 -->
+  <button id="sidebarToggle" class="icon-btn small drawer-toggle" title="{{ t('展开/收起筛选') }}" aria-label="{{ t('展开/收起筛选') }}">
+    <i class="fas fa-angle-right"></i>
+  </button>
+  <aside id="sidebarPanel" class="drawer" data-open="false" aria-hidden="true" aria-label="{{ t('筛选侧边栏') }}">
+    <div class="drawer-header">
+      <div class="drawer-title">
+        <i class="fas fa-sliders"></i>
+        <span>{{ t('筛选') }}</span>
+      </div>
+      <button id="drawerCloseBtn" class="icon-btn small drawer-close" title="{{ t('收起筛选') }}" aria-label="{{ t('收起筛选') }}" style="display:none">
+        <i class="fas fa-angle-left"></i>
+      </button>
+    </div>
+
+    <div class="drawer-section">
+      <div class="section-title">
+        <i class="fas fa-tags"></i>
+        <span>{{ t('标签') }}</span>
+        <button class="link-btn reset-btn" data-reset="tags">{{ t('全部') }}</button>
+      </div>
+      <div class="facet-list">
+        {% if tag_counts and tag_counts|length > 0 %}
+          {% for tag, cnt in tag_counts|dictsort(by='value', reverse=True) %}
+            <label class="facet-item">
+              <input type="checkbox" name="ftag" value="{{ tag }}" {% if tag in selected_tags %}checked{% endif %}>
+              <span class="facet-label" title="{{ tag }}">{{ tag }}</span>
+              <span class="facet-count">{{ cnt }}</span>
+            </label>
+          {% endfor %}
+        {% else %}
+          <div class="facet-empty">{{ t('暂无标签') }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="section-title">
+        <i class="fas fa-database"></i>
+        <span>{{ t('来源') }}</span>
+        <button class="link-btn reset-btn" data-reset="sources">{{ t('全部') }}</button>
+      </div>
+      <div class="facet-list">
+        {% if source_counts and source_counts|length > 0 %}
+          {% for src, cnt in source_counts|dictsort(by='value', reverse=True) %}
+            <label class="facet-item">
+              <input type="checkbox" name="fsrc" value="{{ src }}" {% if src in selected_sources %}checked{% endif %}>
+              <span class="facet-label" title="{{ t('未设置') if src=='(empty)' else src }}">{{ t('未设置') if src=='(empty)' else src }}</span>
+              <span class="facet-count">{{ cnt }}</span>
+            </label>
+          {% endfor %}
+        {% else %}
+          <div class="facet-empty">{{ t('暂无来源') }}</div>
+        {% endif %}
+      </div>
+    </div>
+  </aside>
+
+  <div class="content-section">
+    {% if prompts|length == 0 %}
+      {% set has_filters = (q and q|length > 0) or (selected_tags and selected_tags|length > 0) or (selected_sources and selected_sources|length > 0) %}
+      <div class="empty-state">
+        <div class="empty-icon">
+          <i class="fas fa-inbox"></i>
+        </div>
+        {% if has_filters %}
+          <h3 class="empty-title">{{ t('没有符合筛选条件的结果') }}</h3>
+          <p class="empty-description">{{ t('调整或清空筛选条件后再试试') }}</p>
+          <button class="btn" id="clearFiltersBtn" type="button">
+            <i class="fas fa-eraser"></i> {{ t('清空筛选条件') }}
+          </button>
+        {% else %}
+          <h3 class="empty-title">{{ t('暂无提示词') }}</h3>
+          <p class="empty-description">{{ t('点击"新建提示词"开始创建您的第一个提示词') }}</p>
+          <a href="{{ url_for('new_prompt') }}" class="btn primary">
+            <i class="fas fa-plus"></i> {{ t('创建第一个提示词') }}
+          </a>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="stats-bar">
+        <div class="stat-item">
+          <i class="fas fa-file-alt"></i>
+          <span class="stat-label">{{ t('总计') }}</span>
+          <span class="stat-value">{{ prompts|length }}</span>
+        </div>
+        <div class="stat-item">
+          <i class="fas fa-star"></i>
+          <span class="stat-label">{{ t('置顶') }}</span>
+          <span class="stat-value">{{ prompts|selectattr('pinned')|list|length }}</span>
+        </div>
+        <div class="stat-item">
+          <i class="fas fa-tag"></i>
+          <span class="stat-label">{{ t('标签') }}</span>
+          <span class="stat-value">{{ tag_suggestions|length }}</span>
+        </div>
+      </div>
+
+      <!-- 视图切换（桌面端） -->
+      <div class="view-toggle" title="{{ t('切换布局') }}" aria-label="{{ t('切换布局') }}">
+        <button id="viewModeToggle" class="icon-btn small" aria-pressed="false">
+          <i class="fas fa-table-cells"></i>
+        </button>
+      </div>
+
+      <div id="promptList" class="list grid-view">
+      {% for p in prompts %}
+        {% set is_locked = (auth_mode == 'per') and (p['id'] in locked_ids) %}
+        <article class="card{% if p['color'] %} color-ring{% endif %}" style="animation-delay: {{ loop.index * 0.1 }}s;{% if p['color'] %} --accent: {{ p['color'] }};{% endif %}">
+            <div class="card-header">
+              <div class="card-title-area">
+                <a href="{{ url_for('unlock_prompt', prompt_id=p['id']) if is_locked else url_for('prompt_detail', prompt_id=p['id']) }}" class="card-title">
+                  <i class="fas fa-file-alt"></i>
+                  <span class="title-text">{{ p['name'] }}</span>
+                </a>
+                <div class="card-actions">
+                  <form method="post" action="{{ url_for('toggle_pin', prompt_id=p['id']) }}" class="inline-form">
+                    <button class="icon-btn" title="{{ t('置顶/取消置顶') }}" aria-label="{{ t('置顶') }}" type="submit">
+                      {% if p['pinned'] %}
+                        <i class="fas fa-star" style="color: var(--star);"></i>
+                      {% else %}
+                        <i class="far fa-star"></i>
+                      {% endif %}
+                    </button>
+                  </form>
+                </div>
+              </div>
+              
+              <div class="card-meta">
+                {% if is_locked %}
+                  <div class="meta-item">
+                    <i class="fas fa-link"></i>
+                    <span class="meta-label">{{ t('来源：') }}</span>
+                    <span class="meta-value">{{ t('需要密码') }}</span>
+                  </div>
+                {% else %}
+                  <div class="meta-item">
+                    <i class="fas fa-link"></i>
+                    <span class="meta-label">{{ t('来源：') }}</span>
+                    <span class="meta-value">{{ p['source'] or '—' }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <i class="fas fa-clock"></i>
+                    <span class="meta-label">{{ t('修改：') }}</span>
+                    <span class="meta-value">{{ (p['updated_at'] or '')[:19].replace('T',' ') }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <i class="fas fa-code-branch"></i>
+                    <span class="meta-label">{{ t('版本：') }}</span>
+                    <span class="meta-value">{{ p['current_version'] or '—' }}</span>
+                  </div>
+                {% endif %}
+              </div>
+              {% if is_locked %}
+              <div class="meta-item" style="margin-top: var(--spacing-sm); color: var(--muted);">
+                <i class="fas fa-lock"></i>
+                <span class="meta-label">{{ t('该提示词受密码保护') }}</span>
+              </div>
+              {% endif %}
+            </div>
+
+            {% set tags = (p['tags'] and (p['tags']|loads)) or [] %}
+            {% if not is_locked and tags %}
+              <div class="card-tags">
+                {% for t in tags %}
+                  <span class="tag">
+                    <i class="fas fa-tag"></i>
+                    {{ t }}
+                  </span>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            {% if p['notes'] and not is_locked %}
+              <div class="card-notes">
+                <i class="fas fa-sticky-note"></i>
+                <span class="notes-text">{{ p['notes'] }}</span>
+              </div>
+            {% endif %}
+
+            {% if p['current_content'] and not is_locked %}
+              <div class="card-preview">
+                <div class="preview-header">
+                  <div class="preview-title">
+                    <i class="fas fa-eye"></i>
+                    <span>{{ t('内容预览') }}</span>
+                  </div>
+                  <button class="copy-preview-btn" onclick="copyPreviewContent(this)" data-content="{{ p['current_content']|e }}" title="{{ t('复制预览内容') }}">
+                    <i class="fas fa-copy"></i>
+                  </button>
+                </div>
+                <div class="preview-content">
+                  {{ p['current_content'][:150] }}{% if p['current_content']|length > 150 %}...{% endif %}
+                </div>
+              </div>
+            {% endif %}
+            </article>
+          {% endfor %}
+          </div>
+    {% endif %}
+  </div>
+
+  <style>
+    /* === 主页视图切换 + 网格卡片布局 === */
+    .view-toggle {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin: -8px 0 var(--spacing-md) 0;
+    }
+    .icon-btn.small {
+      min-height: 32px;
+      min-width: 32px;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .icon-btn.small:hover {
+      color: var(--primary);
+      background: color-mix(in srgb, var(--primary) 8%, transparent);
+      transform: scale(1.05);
+    }
+    .icon-btn.small[aria-pressed="true"] {
+      color: var(--bg);
+      background: var(--fg);
+      border-color: var(--fg);
+    }
+
+    /* 桌面端抽屉式侧边栏（覆盖不挤压内容） */
+    @media (min-width: 769px) {
+      :root { --drawer-w: 280px; --drawer-top: 72px; }
+      .drawer {
+        position: fixed;
+        top: var(--drawer-top);
+        left: 0;
+        width: var(--drawer-w);
+        height: calc(100vh - var(--drawer-top));
+        background: var(--card);
+        border-right: 1px solid var(--border);
+        box-shadow: 0 10px 30px var(--shadow);
+        border-top-right-radius: var(--radius-xl);
+        border-bottom-right-radius: var(--radius-xl);
+        transform: translateX(-100%);
+        transition: transform .25s ease;
+        overflow: auto;
+        z-index: 900;
+        padding: var(--spacing-md);
+      }
+      .drawer[data-open="true"] { transform: translateX(0); }
+
+      .drawer-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--spacing-sm); }
+      .drawer-title { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); font-weight: 600; }
+      .drawer-close { border: none; background: transparent; color: var(--muted); transition: color .2s ease, transform .2s ease; }
+      .drawer-close:hover { color: var(--primary); transform: scale(1.05); }
+      .drawer-section { border-top: 1px dashed var(--border); padding-top: var(--spacing-md); margin-top: var(--spacing-md); }
+
+      .drawer .section-title { display: flex; align-items: center; justify-content: space-between; font-size: var(--font-size-sm); margin-bottom: var(--spacing-sm); color: var(--muted); gap: var(--spacing-sm); }
+
+      .drawer .facet-list { display: grid; gap: 6px; padding-right: 4px; }
+      .drawer .facet-item { display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--radius-md); cursor: pointer; }
+      .drawer .facet-item:hover { background: color-mix(in srgb, var(--primary) 6%, transparent); }
+      .drawer .facet-count { font-size: 12px; color: var(--muted); border: 1px solid var(--border); padding: 0 8px; border-radius: 999px; min-width: 28px; text-align: center; }
+
+      .drawer-toggle {
+        position: fixed;
+        top: calc(var(--drawer-top) + 10px);
+        left: 0;
+        z-index: 950;
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--card) 85%, transparent);
+        color: var(--fg);
+        border: none;
+        outline: none;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 6px 16px var(--shadow);
+        transition: transform .2s ease, background .2s ease, box-shadow .2s ease;
+      }
+      .drawer-toggle:hover { background: color-mix(in srgb, var(--primary) 12%, var(--card)); }
+      .drawer-toggle:focus { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent), 0 6px 16px var(--shadow); }
+      .drawer-toggle:active { transform: scale(0.95); }
+      .drawer-toggle i { transition: transform .2s ease; }
+      .drawer-toggle[data-open="true"] { background: color-mix(in srgb, var(--primary) 8%, var(--card)); }
+      .drawer-toggle.clicked { animation: pop .18s ease; }
+      @keyframes pop { 0% { transform: scale(0.96); } 100% { transform: scale(1); } }
+    }
+
+    @media (max-width: 768px) {
+      /* 移动端隐藏抽屉和开关 */
+      .drawer, .drawer-toggle { display: none !important; }
+    }
+
+    /* 网格视图（桌面端） */
+    #promptList.grid-view {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: var(--spacing-xl);
+    }
+    /* 列表视图 */
+    #promptList.list-view {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: var(--spacing-xl);
+    }
+    /* 移动端保持单列并隐藏切换 */
+    @media (max-width: 768px) {
+      .view-toggle { display: none; }
+      #promptList { grid-template-columns: 1fr !important; }
+    }
+
+    .home-layout {
+      /* 全宽铺满，让侧边栏贴齐屏幕最左侧 */
+      width: 100vw;
+      margin-left: calc(50% - 50vw);
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: var(--spacing-xl);
+      align-items: start;
+    }
+    .sidebar {
+      position: sticky;
+      top: 76px; /* 顶部栏高度 + 间距 */
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: var(--spacing-md);
+      min-height: 200px;
+      transition: width 0.2s ease, padding 0.2s ease;
+      width: 100%;
+      overflow: hidden;
+    }
+    .sidebar-header { position: relative; min-height: 44px; }
+    .sidebar #sidebarToggle {
+      position: absolute;
+      top: 8px;
+      left: 8px; /* 按钮位于侧边栏内部左上角 */
+      z-index: 2;
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+    }
+    .sidebar[data-collapsed="true"] {
+      width: 56px; /* 折叠为窄栏，仅显示按钮 */
+      padding: var(--spacing-sm);
+    }
+    /* 折叠时隐藏内容区与标题，仅保留按钮 */
+    .sidebar[data-collapsed="true"] .sidebar-section { display: none; }
+    .sidebar[data-collapsed="true"] .sidebar-title { display: none; }
+
+    /* 侧边栏收起时，主区域占满 */
+    #homeLayout[data-sidebar-collapsed="true"] {
+      grid-template-columns: 56px 1fr;
+    }
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 8px 4px 48px; /* 为左上角按钮预留空间 */
+      margin-bottom: var(--spacing-sm);
+    }
+    .sidebar-title {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .sidebar-section { 
+      border-top: 1px dashed var(--border);
+      padding-top: var(--spacing-md);
+      margin-top: var(--spacing-md);
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: var(--font-size-sm);
+      margin-bottom: var(--spacing-sm);
+      color: var(--muted);
+      gap: var(--spacing-sm);
+    }
+    .section-title i { opacity: .8; }
+    .link-btn {
+      background: transparent;
+      border: none;
+      color: var(--primary);
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: var(--radius-md);
+    }
+    .link-btn:hover {
+      background: color-mix(in srgb, var(--primary) 10%, transparent);
+    }
+    .facet-list {
+      display: grid;
+      gap: 6px;
+      max-height: 360px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .facet-item {
+      display: grid;
+      grid-template-columns: 20px 1fr auto;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: var(--radius-md);
+      transition: background 0.2s ease;
+      cursor: pointer;
+    }
+    .facet-item:hover { background: color-mix(in srgb, var(--primary) 6%, transparent); }
+    .facet-item input { margin: 0; }
+    .facet-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .facet-count {
+      font-size: 12px;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 0 8px;
+      border-radius: 999px;
+      min-width: 28px;
+      text-align: center;
+    }
+    .facet-empty { color: var(--muted); font-size: var(--font-size-sm); padding: 6px 8px; }
+
+    .main { 
+      width: 100%; 
+      max-width: 1200px; 
+      padding: 0 var(--spacing-xl);
+      margin: 0 auto;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: center;
+      margin-bottom: var(--spacing-2xl);
+      padding: var(--spacing-xl);
+      background: var(--card);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border);
+    }
+    
+    .search-form {
+      display: flex;
+      flex-direction: row;
+      gap: var(--spacing-md);
+      align-items: center;
+      width: 100%;
+      max-width: 800px;
+      flex-wrap: wrap;
+    }
+    
+    .search-controls {
+      display: flex;
+      gap: var(--spacing-md);
+      align-items: center;
+      flex-wrap: nowrap;
+      flex-shrink: 0;
+    }
+    
+    .create-section {
+      display: flex;
+      justify-content: center;
+      margin-bottom: var(--spacing-2xl);
+      width: 100%;
+    }
+    
+    .create-actions {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      max-width: 1200px;
+    }
+    
+    .create-btn {
+      width: 100%;
+      max-width: 1200px;
+      padding: var(--spacing-md);
+      font-size: var(--font-size-lg);
+      justify-content: center;
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      border-radius: var(--radius-xl);
+      height: 52px;
+      box-sizing: border-box;
+    }
+    
+    .search-input-wrapper {
+      position: relative;
+      flex: 1;
+      min-width: 200px;
+    }
+    
+    .search-input-wrapper i {
+      position: absolute;
+      left: var(--spacing-lg);
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+    }
+    
+    .search-input-wrapper input {
+      width: 100%;
+      padding: var(--spacing-md) var(--spacing-lg) var(--spacing-md) calc(var(--spacing-lg) + 32px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--bg);
+      color: var(--fg);
+      font-size: var(--font-size-base);
+      transition: all 0.3s ease;
+      height: 48px;
+      box-sizing: border-box;
+    }
+    
+    .search-input-wrapper input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
+    }
+    
+    .sort-select {
+      padding: var(--spacing-md) var(--spacing-lg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--bg);
+      color: var(--fg);
+      font-size: var(--font-size-sm);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      min-width: 110px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      box-sizing: border-box;
+    }
+    
+    .sort-select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
+    }
+    
+    .search-btn {
+      padding: var(--spacing-sm) var(--spacing-lg);
+      background: var(--primary);
+      color: var(--text-on-primary);
+      border: none;
+      border-radius: var(--radius-lg);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--spacing-xs);
+      flex-shrink: 0;
+      box-sizing: border-box;
+    }
+    
+    .search-btn:hover {
+      background: color-mix(in srgb, var(--primary) 90%, var(--card));
+    }
+    
+    .content-section {
+      margin-bottom: var(--spacing-2xl);
+    }
+    
+    .stats-bar {
+      display: flex;
+      gap: var(--spacing-xl);
+      margin-bottom: var(--spacing-2xl);
+      padding: var(--spacing-lg);
+      background: var(--card);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border);
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      font-size: var(--font-size-sm);
+    }
+    
+    .stat-item i {
+      font-size: var(--font-size-lg);
+      color: var(--primary);
+    }
+    
+    .stat-label {
+      color: var(--muted);
+      font-weight: 500;
+    }
+    
+    .stat-value {
+      font-weight: 700;
+      color: var(--primary);
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: var(--spacing-4xl);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-xl);
+      background: color-mix(in srgb, var(--card) 50%, transparent);
+    }
+    
+    .empty-icon {
+      font-size: 4rem;
+      color: var(--muted);
+      opacity: 0.5;
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .empty-title {
+      font-size: var(--font-size-xl);
+      font-weight: 600;
+      color: var(--fg);
+      margin: 0 0 var(--spacing-sm) 0;
+    }
+    
+    .empty-description {
+      font-size: var(--font-size-base);
+      color: var(--muted);
+      margin: 0 0 var(--spacing-xl) 0;
+    }
+    
+    .card-header {
+      margin-bottom: var(--spacing-md);
+      padding-left: var(--spacing-sm);
+    }
+    
+    .card-title-area {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--spacing-sm);
+    }
+    
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      font-size: var(--font-size-lg);
+      font-weight: 600;
+      color: var(--primary);
+      text-decoration: none;
+      flex: 1;
+      margin-right: var(--spacing-md);
+    }
+    
+    .card-title:hover {
+      text-decoration: underline;
+    }
+    
+    .card-title i {
+      opacity: 0.8;
+    }
+    
+    .title-text {
+      flex: 1;
+    }
+    
+    .card-actions {
+      display: flex;
+      gap: var(--spacing-sm);
+      align-items: center;
+    }
+    
+    .card-actions .icon-btn {
+      min-height: 40px;
+      min-width: 40px;
+      padding: var(--spacing-sm);
+      border-radius: var(--radius-md);
+      transition: all 0.2s ease;
+    }
+    
+    .card-actions .icon-btn:hover {
+      background: color-mix(in srgb, var(--primary) 10%, transparent);
+      transform: scale(1.05);
+    }
+    
+    .card-meta {
+      display: flex;
+      gap: var(--spacing-lg);
+      flex-wrap: wrap;
+      font-size: var(--font-size-xs);
+      color: var(--muted);
+    }
+    
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+    }
+    
+    .meta-item i {
+      opacity: 0.7;
+    }
+    
+    .meta-label {
+      font-weight: 500;
+    }
+    
+    .card-tags {
+      display: flex;
+      gap: var(--spacing-sm);
+      margin-top: var(--spacing-lg);
+      flex-wrap: wrap;
+    }
+    
+    .tag {
+      background: transparent; 
+      border: 1px dashed var(--border); 
+      padding: var(--spacing-sm) var(--spacing-md); 
+      border-radius: 20px; 
+      font-size: var(--font-size-xs); 
+      color: var(--muted);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      min-height: 28px;
+    }
+    
+    .card-notes {
+      margin-top: var(--spacing-lg);
+      font-size: var(--font-size-sm);
+      color: var(--fg);
+      line-height: 1.6;
+      display: flex;
+      align-items: flex-start;
+      gap: var(--spacing-sm);
+      padding: var(--spacing-sm) 0;
+    }
+    
+    .card-notes i {
+      opacity: 0.7;
+      margin-top: 2px;
+    }
+    
+    .card-preview {
+      margin-top: var(--spacing-lg);
+      padding: var(--spacing-sm) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
+      background: color-mix(in srgb, var(--bg) 30%, var(--card));
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+    }
+    
+    .preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--spacing-xs);
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: var(--spacing-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .preview-title {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+    }
+    
+    .copy-preview-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: var(--spacing-sm);
+      border-radius: var(--radius-md);
+      font-size: var(--font-size-xs);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 32px;
+      min-width: 32px;
+    }
+    
+    .copy-preview-btn:hover {
+      color: var(--primary);
+      background: color-mix(in srgb, var(--primary) 10%, transparent);
+    }
+    
+    .copy-preview-btn.copied {
+      color: var(--success);
+    }
+    
+      
+    .inline-form {
+      display: inline;
+    }
+    
+    @media (max-width: 768px) {
+      .home-layout {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-lg);
+      }
+      .sidebar { display: none; }
+      .toolbar {
+        padding: var(--spacing-lg);
+        margin-bottom: var(--spacing-xl);
+      }
+      
+      .search-form {
+        flex-direction: column;
+        gap: var(--spacing-md);
+        align-items: stretch;
+      }
+      
+      .search-controls {
+        gap: var(--spacing-sm);
+        flex-wrap: nowrap;
+        width: 100%;
+      }
+      
+      .sort-select {
+        flex: 3;
+        min-width: 0;
+        font-size: var(--font-size-sm);
+      }
+      
+      .search-btn {
+        flex: 1;
+        padding: var(--spacing-md);
+        font-size: var(--font-size-sm);
+        min-width: 0;
+      }
+      
+      .search-input-wrapper {
+        width: 100%;
+        min-width: auto;
+      }
+      
+      .search-input-wrapper input {
+        font-size: var(--font-size-xs);
+      }
+      
+      .create-section {
+        margin-bottom: var(--spacing-lg);
+      }
+      
+      .create-actions {
+        max-width: none;
+        padding: 0 var(--spacing-md);
+      }
+      
+      .create-btn {
+        max-width: none;
+        font-size: var(--font-size-base);
+        padding: var(--spacing-lg);
+      }
+      
+      .stats-bar {
+        gap: var(--spacing-md);
+        padding: var(--spacing-lg);
+        justify-content: space-around;
+      }
+      
+      .card-title-area {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--spacing-sm);
+      }
+      
+      .card-title {
+        margin-right: var(--spacing-sm);
+        font-size: var(--font-size-lg);
+      }
+      
+      /* 保持元信息水平显示，但优化间距 */
+      .card-meta {
+        gap: var(--spacing-md);
+        flex-wrap: wrap;
+        font-size: var(--font-size-xs);
+      }
+      
+      .meta-item {
+        min-width: fit-content;
+      }
+      
+      .card-preview {
+        margin-top: var(--spacing-lg);
+        padding: var(--spacing-xs) var(--spacing-md) var(--spacing-md) var(--spacing-md);
+      }
+      
+      .card-tags {
+        margin-top: var(--spacing-md);
+        gap: var(--spacing-xs);
+      }
+      
+      .tag {
+        font-size: 11px;
+        padding: var(--spacing-xs) var(--spacing-sm);
+        min-height: 24px;
+      }
+      
+      .card-notes {
+        margin-top: var(--spacing-md);
+        font-size: var(--font-size-xs);
+      }
+    }
+  </style>
+  
+  <script>
+    // 抽屉侧边栏：仅桌面端显示，覆盖式，不挤压内容
+    (function() {
+      const panel = document.getElementById('sidebarPanel');
+      const toggle = document.getElementById('sidebarToggle');
+      const closeBtn = document.getElementById('drawerCloseBtn');
+      if (!panel || !toggle) return;
+
+      const SBW = 280; // 与 --drawer-w 同步
+      const key = 'sidebarOpen';
+      const saved = localStorage.getItem(key);
+      if (saved === 'true') {
+        panel.dataset.open = 'true';
+        panel.setAttribute('aria-hidden', 'false');
+        toggle.style.left = '0px';
+        toggle.style.display = 'none';
+        toggle.innerHTML = '<i class="fas fa-angle-left"></i>';
+        toggle.setAttribute('data-open', 'true');
+        if (closeBtn) closeBtn.style.display = 'inline-flex';
+      }
+
+      function setOpen(open) {
+        panel.dataset.open = open ? 'true' : 'false';
+        panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+        localStorage.setItem(key, String(open));
+        toggle.style.left = '0px';
+        toggle.innerHTML = open ? '<i class="fas fa-angle-left"></i>' : '<i class="fas fa-angle-right"></i>';
+        toggle.setAttribute('data-open', open ? 'true' : 'false');
+        // 打开时隐藏外侧按钮，显示抽屉内关闭按钮；收起相反
+        toggle.style.display = open ? 'none' : 'inline-flex';
+        if (closeBtn) closeBtn.style.display = open ? 'inline-flex' : 'none';
+        toggle.classList.remove('clicked');
+        // 触发轻微弹跳动画
+        requestAnimationFrame(() => {
+          toggle.classList.add('clicked');
+          setTimeout(() => toggle.classList.remove('clicked'), 200);
+        });
+      }
+
+      toggle.addEventListener('click', () => {
+        const isOpen = panel.dataset.open === 'true';
+        setOpen(!isOpen);
+      });
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => setOpen(false));
+      }
+
+      // 点击抽屉外部区域关闭（可选：目前不加遮罩，保持轻量）
+    })();
+
+      // 构建查询并跳转
+      function applyFilters() {
+        const params = new URLSearchParams(window.location.search);
+        // 保留 q/sort
+        const keep = { q: params.get('q') || '', sort: params.get('sort') || '' };
+        params.forEach((_, k) => { if (!['q','sort'].includes(k)) params.delete(k); });
+
+        // tags
+        const tags = Array.from(document.querySelectorAll('input[name="ftag"]:checked')).map(i => i.value);
+        tags.forEach(t => params.append('tag', t));
+        // sources
+        const srcs = Array.from(document.querySelectorAll('input[name="fsrc"]:checked')).map(i => i.value);
+        srcs.forEach(s => params.append('source', s));
+
+        if (keep.q) params.set('q', keep.q);
+        if (keep.sort) params.set('sort', keep.sort);
+        const url = `${window.location.pathname}?${params.toString()}`;
+        window.location.assign(url);
+      }
+
+      // 绑定复选框事件
+      document.querySelectorAll('input[name="ftag"], input[name="fsrc"]').forEach(el => {
+        el.addEventListener('change', applyFilters);
+      });
+      // 重置按钮
+      document.querySelectorAll('.reset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const type = btn.dataset.reset;
+          if (type === 'tags') {
+            document.querySelectorAll('input[name="ftag"]').forEach(i => i.checked = false);
+          } else if (type === 'sources') {
+            document.querySelectorAll('input[name="fsrc"]').forEach(i => i.checked = false);
+          }
+          applyFilters();
+        });
+      });
+
+      // 清空筛选按钮（空结果时显示）
+      const clearBtn = document.getElementById('clearFiltersBtn');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+          document.querySelectorAll('input[name="ftag"], input[name="fsrc"]').forEach(i => i.checked = false);
+          applyFilters();
+        });
+      }
+
+    // 视图切换：在桌面端于列表上方显示，按钮图标在网格/列表间切换
+    (function() {
+      const listEl = document.getElementById('promptList');
+      const btn = document.getElementById('viewModeToggle');
+      if (!listEl || !btn) return;
+
+      // 仅桌面端展示切换
+      const isDesktop = () => window.matchMedia('(min-width: 769px)').matches;
+
+      // 恢复偏好
+      const saved = localStorage.getItem('viewMode') || 'grid';
+      setMode(saved);
+
+      // 绑定事件
+      btn.addEventListener('click', () => {
+        const next = listEl.classList.contains('grid-view') ? 'list' : 'grid';
+        setMode(next);
+        localStorage.setItem('viewMode', next);
+      });
+
+      // 根据窗口变化（如缩放到移动端）调整可见性与布局
+      window.addEventListener('resize', () => {
+        if (!isDesktop()) {
+          btn.setAttribute('aria-pressed', 'false');
+        } else {
+          const current = localStorage.getItem('viewMode') || 'grid';
+          setMode(current);
+        }
+      });
+
+      function setMode(mode) {
+        if (mode === 'list') {
+          listEl.classList.remove('grid-view');
+          listEl.classList.add('list-view');
+          btn.setAttribute('aria-pressed', 'true');
+          btn.innerHTML = '<i class="fas fa-list"></i>';
+        } else {
+          listEl.classList.remove('list-view');
+          listEl.classList.add('grid-view');
+          btn.setAttribute('aria-pressed', 'false');
+          btn.innerHTML = '<i class="fas fa-table-cells"></i>';
+        }
+      }
+    })();
+
+    async function copyPreviewContent(button) {
+      const content = button.getAttribute('data-content');
+      
+      if (!content) {
+        return;
+      }
+      
+      // Check if clipboard API is available
+      if (!navigator.clipboard) {
+        fallbackCopyTextToClipboard(content, button);
+        return;
+      }
+      
+      try {
+        await navigator.clipboard.writeText(content);
+        
+        // Show success feedback
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i>';
+        button.classList.add('copied');
+        
+        setTimeout(() => {
+          button.innerHTML = originalHTML;
+          button.classList.remove('copied');
+        }, 2000);
+      } catch (err) {
+        console.error('Clipboard API failed:', err);
+        // Fallback to traditional method
+        fallbackCopyTextToClipboard(content, button);
+      }
+    }
+    
+    function fallbackCopyTextToClipboard(text, button) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      
+      // Avoid scrolling to bottom
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.position = "fixed";
+      
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          const originalHTML = button.innerHTML;
+          button.innerHTML = '<i class="fas fa-check"></i>';
+          button.classList.add('copied');
+          
+          setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('copied');
+          }, 2000);
+        } else {
+          throw new Error('execCommand failed');
+        }
+      } catch (err) {
+        console.error('Fallback copy failed:', err);
+        alert('复制失败，请手动选择文本复制');
+      }
+      
+      document.body.removeChild(textArea);
+    }
+  </script>
+{% endblock %}

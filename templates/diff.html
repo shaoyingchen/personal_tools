@@ -1,0 +1,250 @@
+{% extends 'layout.html' %}
+{% block title %}{{ t('版本对比') }} - {{ prompt['name'] }} - {{ t('Prompt 管理器') }}{% endblock %}
+{% block content %}
+  <div class="diff-page">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-main">
+          <h1 class="page-title">
+            <i class="fas fa-code-compare"></i>
+            {{ t('版本对比') }}
+          </h1>
+          <div class="breadcrumb">
+            <a href="{{ url_for('index') }}" class="breadcrumb-item">
+              <i class="fas fa-home"></i> {{ t('首页') }}
+            </a>
+            <span class="breadcrumb-separator">/</span>
+            <a href="{{ url_for('prompt_detail', prompt_id=prompt['id']) }}" class="breadcrumb-item">
+              {{ prompt['name'] }}
+            </a>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-item active">{{ t('版本对比') }}</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <a href="{{ url_for('prompt_detail', prompt_id=prompt['id']) }}" class="btn ghost">
+            <i class="fas fa-arrow-left"></i> {{ t('返回编辑') }}
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 工具栏 -->
+    <section class="diff-toolbar">
+      <form method="get" class="diff-form" action="{{ url_for('diff_view', prompt_id=prompt['id']) }}">
+        <div class="toolbar-grid">
+          <label class="field field-left">
+            <span class="label"><i class="fas fa-arrow-left"></i> {{ t('左（旧）') }}</span>
+            <select name="left" class="version-select">
+              {% for v in versions %}
+                <option value="{{ v['id'] }}" {% if left and v['id']==left['id'] %}selected{% endif %}>{{ v['version'] }} · {{ (v['created_at'] or '')[:19].replace('T',' ') }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="toolbar-right-row">
+            <label class="field field-right">
+              <span class="label"><i class="fas fa-arrow-right"></i> {{ t('右（新）') }}</span>
+              <select name="right" class="version-select">
+                {% for v in versions %}
+                  <option value="{{ v['id'] }}" {% if right and v['id']==right['id'] %}selected{% endif %}>{{ v['version'] }} · {{ (v['created_at'] or '')[:19].replace('T',' ') }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="field mode-field">
+              <span class="label"><i class="fas fa-sliders"></i> {{ t('模式') }}</span>
+              <select name="mode" class="version-select">
+                <option value="word" {% if mode=='word' %}selected{% endif %}>{{ t('词级') }}</option>
+                <option value="line" {% if mode=='line' %}selected{% endif %}>{{ t('行级') }}</option>
+              </select>
+            </label>
+            <div class="actions">
+              <button class="btn primary" type="submit"><i class="fas fa-rotate"></i> {{ t('刷新') }}</button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- Diff 统计信息 -->
+    <section class="diff-stats" id="diffStats">
+      <div class="diff-stat added">
+        <i class="fas fa-plus-circle"></i>
+        <span>{{ t('新增') }}: <span id="addedCount">0</span></span>
+      </div>
+      <div class="diff-stat removed">
+        <i class="fas fa-minus-circle"></i>
+        <span>{{ t('删除') }}: <span id="removedCount">0</span></span>
+      </div>
+      <div class="diff-stat changed">
+        <i class="fas fa-edit"></i>
+        <span>{{ t('修改') }}: <span id="changedCount">0</span></span>
+      </div>
+    </section>
+
+    <!-- Diff 内容 -->
+    <section class="diff-view">
+      <div class="diff-card">
+        <div class="diff-header">
+          <div class="side side-left">
+            <i class="fas fa-file-alt"></i>
+            {{ t('旧版本') }} {{ left['version'] }}
+            <small>{{ (left['created_at'] or '')[:19].replace('T',' ') }}</small>
+          </div>
+          <div class="side side-right">
+            <i class="fas fa-file-alt"></i>
+            {{ t('新版本') }} {{ right['version'] }}
+            <small>{{ (right['created_at'] or '')[:19].replace('T',' ') }}</small>
+          </div>
+        </div>
+        <div class="diff-container">
+          {{ diff_html|safe }}
+        </div>
+      </div>
+    </section>
+
+    <!-- 增强的并排对比模式 -->
+    <section class="enhanced-diff-view" id="enhancedDiffView" style="display: none;">
+      <div class="diff-content-enhanced">
+        <div class="diff-side old-version">
+          <h4><i class="fas fa-file-alt"></i> {{ t('旧版本') }} {{ left['version'] }}</h4>
+          <div class="diff-text">{{ left['content'] or '' }}</div>
+        </div>
+        <div class="diff-side new-version">
+          <h4><i class="fas fa-file-alt"></i> {{ t('新版本') }} {{ right['version'] }}</h4>
+          <div class="diff-text">{{ right['content'] or '' }}</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // 计算差异统计
+      function calculateDiffStats() {
+        const diffContainer = document.querySelector('.diff-container');
+        if (!diffContainer) return;
+
+        let addedCount = 0;
+        let removedCount = 0;
+        let changedCount = 0;
+
+        // 查找差异元素
+        const addedElements = diffContainer.querySelectorAll('.diff_add, .diff-ins, tr.ins td');
+        const removedElements = diffContainer.querySelectorAll('.diff_sub, .diff-del, tr.del td');
+        const changedElements = diffContainer.querySelectorAll('.diff_chg, tr.chg td');
+
+        addedCount = addedElements.length;
+        removedCount = removedElements.length;
+        changedCount = changedElements.length;
+
+        // 更新统计显示
+        const addedCountEl = document.getElementById('addedCount');
+        const removedCountEl = document.getElementById('removedCount');
+        const changedCountEl = document.getElementById('changedCount');
+
+        if (addedCountEl) addedCountEl.textContent = addedCount;
+        if (removedCountEl) removedCountEl.textContent = removedCount;
+        if (changedCountEl) changedCountEl.textContent = changedCount;
+      }
+
+      // 切换视图模式
+      function addViewToggle() {
+        const toolbar = document.querySelector('.actions');
+        if (!toolbar) return;
+
+        // 创建切换按钮
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'btn ghost';
+        toggleBtn.innerHTML = '<i class="fas fa-columns"></i> {{ t('并排对比') }}';
+        toggleBtn.type = 'button';
+        toggleBtn.title = '{{ t('切换到并排对比模式') }}';
+
+        let isEnhancedView = false;
+
+        toggleBtn.addEventListener('click', function() {
+          const diffView = document.querySelector('.diff-view');
+          const enhancedView = document.getElementById('enhancedDiffView');
+
+          if (!diffView || !enhancedView) return;
+
+          isEnhancedView = !isEnhancedView;
+
+          if (isEnhancedView) {
+            diffView.style.display = 'none';
+            enhancedView.style.display = 'block';
+            toggleBtn.innerHTML = '<i class="fas fa-list"></i> {{ t('差异视图') }}';
+            toggleBtn.title = '{{ t('切换到差异视图') }}';
+          } else {
+            diffView.style.display = 'block';
+            enhancedView.style.display = 'none';
+            toggleBtn.innerHTML = '<i class="fas fa-columns"></i> {{ t('并排对比') }}';
+            toggleBtn.title = '{{ t('切换到并排对比模式') }}';
+          }
+        });
+
+        toolbar.insertBefore(toggleBtn, toolbar.firstChild);
+      }
+
+      // 添加快捷键支持
+      function addKeyboardShortcuts() {
+        document.addEventListener('keydown', function(e) {
+          // Ctrl/Cmd + Shift + V: 切换视图
+          if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'V') {
+            const toggleBtn = document.querySelector('.actions button');
+            if (toggleBtn) {
+              toggleBtn.click();
+            }
+          }
+        });
+      }
+
+      // 添加滚动同步功能
+      function addScrollSync() {
+        const enhancedView = document.getElementById('enhancedDiffView');
+        if (!enhancedView) return;
+
+        const leftSide = enhancedView.querySelector('.old-version .diff-text');
+        const rightSide = enhancedView.querySelector('.new-version .diff-text');
+
+        if (!leftSide || !rightSide) return;
+
+        let isScrolling = false;
+
+        function syncScroll(source, target) {
+          if (isScrolling) return;
+          isScrolling = true;
+
+          const scrollPercentage = source.scrollTop / (source.scrollHeight - source.clientHeight);
+          target.scrollTop = scrollPercentage * (target.scrollHeight - target.clientHeight);
+
+          setTimeout(() => {
+            isScrolling = false;
+          }, 50);
+        }
+
+        leftSide.addEventListener('scroll', () => syncScroll(leftSide, rightSide));
+        rightSide.addEventListener('scroll', () => syncScroll(rightSide, leftSide));
+      }
+
+      // 初始化所有功能
+      calculateDiffStats();
+      addViewToggle();
+      addKeyboardShortcuts();
+      addScrollSync();
+
+      // 监听内容变化，重新计算统计
+      const observer = new MutationObserver(calculateDiffStats);
+      const diffContainer = document.querySelector('.diff-container');
+      if (diffContainer) {
+        observer.observe(diffContainer, {
+          childList: true,
+          subtree: true,
+          attributes: false,
+          characterData: true
+        });
+      }
+    });
+  </script>
+
+{% endblock %}

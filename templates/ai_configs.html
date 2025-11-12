@@ -1,0 +1,411 @@
+{% extends "layout.html" %}
+
+{% block title %}AI 配置管理{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>AI 配置管理</h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addConfigModal">
+            <i class="fas fa-plus"></i> 添加配置
+        </button>
+    </div>
+
+    <!-- 配置列表 -->
+    <div class="row" id="configsList">
+        <!-- 配置卡片将通过 JavaScript 动态生成 -->
+    </div>
+
+    <!-- 添加配置模态框 -->
+    <div class="modal fade" id="addConfigModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">添加 AI 配置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addConfigForm">
+                        <div class="mb-3">
+                            <label for="configName" class="form-label">配置名称 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="configName" required>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="provider" class="form-label">AI 服务商</label>
+                                <select class="form-select" id="provider">
+                                    <option value="openai">OpenAI</option>
+                                    <option value="claude">Claude (Anthropic)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="modelName" class="form-label">模型名称</label>
+                                <input type="text" class="form-control" id="modelName" value="gpt-4">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="apiKey" class="form-label">API 密钥</label>
+                            <input type="password" class="form-control" id="apiKey" placeholder="请输入 API 密钥">
+                            <div class="form-text">密钥将被加密存储</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="apiUrl" class="form-label">API 地址（可选）</label>
+                            <input type="url" class="form-control" id="apiUrl" placeholder="留空使用默认地址">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="systemPrompt" class="form-label">系统提示词</label>
+                            <textarea class="form-control" id="systemPrompt" rows="3">你是一个专业的提示词优化专家，请根据用户的要求优化提示词。</textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="temperature" class="form-label">Temperature (0-1)</label>
+                                <input type="number" class="form-control" id="temperature" min="0" max="1" step="0.1" value="0.7">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="maxTokens" class="form-label">最大 Token 数</label>
+                                <input type="number" class="form-control" id="maxTokens" min="100" value="2000">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="saveConfig()">保存配置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑配置模态框 -->
+    <div class="modal fade" id="editConfigModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑 AI 配置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editConfigForm">
+                        <input type="hidden" id="editConfigId">
+
+                        <div class="mb-3">
+                            <label for="editConfigName" class="form-label">配置名称 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="editConfigName" required>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="editProvider" class="form-label">AI 服务商</label>
+                                <select class="form-select" id="editProvider">
+                                    <option value="openai">OpenAI</option>
+                                    <option value="claude">Claude (Anthropic)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editModelName" class="form-label">模型名称</label>
+                                <input type="text" class="form-control" id="editModelName">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="editApiKey" class="form-label">API 密钥</label>
+                            <input type="password" class="form-control" id="editApiKey" placeholder="留空保持不变">
+                            <div class="form-text">留空保持原有密钥不变</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="editApiUrl" class="form-label">API 地址（可选）</label>
+                            <input type="url" class="form-control" id="editApiUrl">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="editSystemPrompt" class="form-label">系统提示词</label>
+                            <textarea class="form-control" id="editSystemPrompt" rows="3"></textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="editTemperature" class="form-label">Temperature (0-1)</label>
+                                <input type="number" class="form-control" id="editTemperature" min="0" max="1" step="0.1">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editMaxTokens" class="form-label">最大 Token 数</label>
+                                <input type="number" class="form-control" id="editMaxTokens" min="100">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="updateConfig()">更新配置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let configs = [];
+
+// 页面加载时获取配置列表
+document.addEventListener('DOMContentLoaded', function() {
+    loadConfigs();
+});
+
+// 加载配置列表
+async function loadConfigs() {
+    try {
+        const response = await fetch('/api/ai-configs');
+        configs = await response.json();
+        renderConfigs();
+    } catch (error) {
+        console.error('加载配置失败:', error);
+        showAlert('加载配置失败', 'danger');
+    }
+}
+
+// 渲染配置列表
+function renderConfigs() {
+    const container = document.getElementById('configsList');
+
+    if (configs.length === 0) {
+        container.innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-info text-center">
+                    <i class="fas fa-info-circle"></i> 暂无 AI 配置，请添加一个配置开始使用优化功能。
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = configs.map(config => `
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">${config.name}</h6>
+                    <span class="badge ${config.is_active ? 'bg-success' : 'bg-secondary'}">
+                        ${config.is_active ? '活跃' : '未激活'}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <strong>服务商:</strong> ${config.provider.toUpperCase()}
+                    </div>
+                    <div class="mb-2">
+                        <strong>模型:</strong> ${config.model_name}
+                    </div>
+                    <div class="mb-2">
+                        <strong>Temperature:</strong> ${config.temperature}
+                    </div>
+                    <div class="mb-2">
+                        <strong>最大 Tokens:</strong> ${config.max_tokens}
+                    </div>
+                    <div class="mb-2">
+                        <small class="text-muted">
+                            创建时间: ${new Date(config.created_at).toLocaleString()}
+                        </small>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="btn-group w-100" role="group">
+                        <button class="btn btn-outline-primary btn-sm" onclick="testConfig(${config.id})">
+                            <i class="fas fa-plug"></i> 测试
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="editConfig(${config.id})">
+                            <i class="fas fa-edit"></i> 编辑
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="deleteConfig(${config.id})">
+                            <i class="fas fa-trash"></i> 删除
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 保存配置
+async function saveConfig() {
+    const form = document.getElementById('addConfigForm');
+    const formData = new FormData(form);
+
+    const data = {
+        name: document.getElementById('configName').value,
+        provider: document.getElementById('provider').value,
+        model_name: document.getElementById('modelName').value,
+        api_key: document.getElementById('apiKey').value,
+        api_url: document.getElementById('apiUrl').value,
+        system_prompt: document.getElementById('systemPrompt').value,
+        temperature: parseFloat(document.getElementById('temperature').value),
+        max_tokens: parseInt(document.getElementById('maxTokens').value)
+    };
+
+    if (!data.name) {
+        showAlert('请输入配置名称', 'danger');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/ai-configs', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            showAlert('配置创建成功', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('addConfigModal')).hide();
+            form.reset();
+            loadConfigs();
+        } else {
+            const error = await response.json();
+            showAlert(error.error || '创建配置失败', 'danger');
+        }
+    } catch (error) {
+        console.error('创建配置失败:', error);
+        showAlert('创建配置失败', 'danger');
+    }
+}
+
+// 编辑配置
+function editConfig(configId) {
+    const config = configs.find(c => c.id === configId);
+    if (!config) return;
+
+    document.getElementById('editConfigId').value = config.id;
+    document.getElementById('editConfigName').value = config.name;
+    document.getElementById('editProvider').value = config.provider;
+    document.getElementById('editModelName').value = config.model_name;
+    document.getElementById('editApiUrl').value = config.api_url || '';
+    document.getElementById('editSystemPrompt').value = config.system_prompt;
+    document.getElementById('editTemperature').value = config.temperature;
+    document.getElementById('editMaxTokens').value = config.max_tokens;
+
+    new bootstrap.Modal(document.getElementById('editConfigModal')).show();
+}
+
+// 更新配置
+async function updateConfig() {
+    const configId = document.getElementById('editConfigId').value;
+
+    const data = {
+        name: document.getElementById('editConfigName').value,
+        provider: document.getElementById('editProvider').value,
+        model_name: document.getElementById('editModelName').value,
+        api_key: document.getElementById('editApiKey').value,
+        api_url: document.getElementById('editApiUrl').value,
+        system_prompt: document.getElementById('editSystemPrompt').value,
+        temperature: parseFloat(document.getElementById('editTemperature').value),
+        max_tokens: parseInt(document.getElementById('editMaxTokens').value)
+    };
+
+    if (!data.name) {
+        showAlert('请输入配置名称', 'danger');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/ai-configs/${configId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            showAlert('配置更新成功', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('editConfigModal')).hide();
+            loadConfigs();
+        } else {
+            const error = await response.json();
+            showAlert(error.error || '更新配置失败', 'danger');
+        }
+    } catch (error) {
+        console.error('更新配置失败:', error);
+        showAlert('更新配置失败', 'danger');
+    }
+}
+
+// 测试配置
+async function testConfig(configId) {
+    try {
+        showAlert('正在测试连接...', 'info');
+
+        const response = await fetch(`/api/ai-configs/${configId}/test`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showAlert('连接测试成功！', 'success');
+        } else {
+            showAlert(result.error || '连接测试失败', 'danger');
+        }
+    } catch (error) {
+        console.error('测试连接失败:', error);
+        showAlert('测试连接失败', 'danger');
+    }
+}
+
+// 删除配置
+async function deleteConfig(configId) {
+    if (!confirm('确定要删除这个配置吗？此操作不可恢复。')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/ai-configs/${configId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            showAlert('配置删除成功', 'success');
+            loadConfigs();
+        } else {
+            const error = await response.json();
+            showAlert(error.error || '删除配置失败', 'danger');
+        }
+    } catch (error) {
+        console.error('删除配置失败:', error);
+        showAlert('删除配置失败', 'danger');
+    }
+}
+
+// 显示提示消息
+function showAlert(message, type) {
+    // 移除现有的 alert
+    const existingAlert = document.querySelector('.alert-temporary');
+    if (existingAlert) {
+        existingAlert.remove();
+    }
+
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show alert-temporary" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+
+    const container = document.querySelector('.container');
+    container.insertAdjacentHTML('afterbegin', alertHtml);
+
+    // 5秒后自动消失
+    setTimeout(() => {
+        const alert = document.querySelector('.alert-temporary');
+        if (alert) {
+            alert.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

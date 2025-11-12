@@ -1,0 +1,918 @@
+{% extends 'layout.html' %}
+{% block title %}AI 配置管理 - {{ t('Prompt 管理器') }}{% endblock %}
+{% block content %}
+<div class="back-line">
+  <a href="{{ url_for('index') }}" class="btn ghost back-btn" onclick="if (window.history.length > 1) { history.back(); return false; }">
+   <i class="fas fa-arrow-left"></i>
+   {{ t('返回') }}
+  </a>
+</div>
+
+<div class="page-header">
+  <h1 class="page-title">
+    <i class="fas fa-robot"></i>
+    AI 配置管理
+  </h1>
+  <p class="page-subtitle">管理您的AI服务配置，支持多种AI提供商</p>
+</div>
+
+<div class="settings-container">
+  <!-- 添加配置按钮 -->
+  <div class="section-content" style="margin-bottom: 20px;">
+    <button class="btn primary" onclick="showAddConfigModal()">
+      <i class="fas fa-plus"></i> 添加新配置
+    </button>
+  </div>
+
+  <!-- 配置列表 -->
+  <div id="configsList" class="configs-grid">
+    <!-- 配置卡片将通过JavaScript动态生成 -->
+  </div>
+</div>
+
+<!-- 添加配置模态框 -->
+<div id="addConfigModal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>添加 AI 配置</h3>
+      <button class="btn-close" onclick="hideAddConfigModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="addConfigForm">
+        <div class="form-group">
+          <label for="configName">配置名称 <span class="required">*</span></label>
+          <input type="text" id="configName" name="name" required placeholder="请输入配置名称">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="provider">AI 服务商</label>
+            <select id="provider" name="provider">
+              <option value="openai">OpenAI</option>
+              <option value="claude">Claude (Anthropic)</option>
+              <option value="local">本地模型</option>
+            </select>
+          </div>
+          <div class="form-group half">
+            <label for="modelName">模型名称</label>
+            <input type="text" id="modelName" name="model_name" value="gpt-4" placeholder="gpt-4">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="apiKey">API 密钥 <span class="required">*</span></label>
+          <div class="password-input-group">
+            <input type="password" id="apiKey" name="api_key" required placeholder="请输入API密钥">
+            <button type="button" class="btn password-toggle" onclick="togglePasswordVisibility('apiKey')" title="显示/隐藏密钥">
+              <i class="fas fa-eye" id="apiKey-icon"></i>
+            </button>
+          </div>
+          <small class="form-help">密钥将被加密存储</small>
+        </div>
+
+        <div class="form-group">
+          <label for="apiUrl">API 地址（可选）</label>
+          <input type="text" id="apiUrl" name="api_url" placeholder="请输入API地址">
+          <small class="form-help">留空使用服务商默认地址</small>
+        </div>
+
+  
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="temperature">Temperature (0-1)</label>
+            <input type="number" id="temperature" name="temperature" min="0" max="1" step="0.1" value="0.7">
+          </div>
+          <div class="form-group half">
+            <label for="maxTokens">最大 Token 数</label>
+            <input type="number" id="maxTokens" name="max_tokens" min="100" value="2000">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="isActive" name="is_active" checked>
+            <span>设为活跃配置</span>
+          </label>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn ghost" onclick="hideAddConfigModal()">取消</button>
+      <button class="btn primary" onclick="saveConfig()">保存配置</button>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑配置模态框 -->
+<div id="editConfigModal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>编辑 AI 配置</h3>
+      <button class="btn-close" onclick="hideEditConfigModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="editConfigForm">
+        <input type="hidden" id="editConfigId" name="id">
+
+        <div class="form-group">
+          <label for="editConfigName">配置名称 <span class="required">*</span></label>
+          <input type="text" id="editConfigName" name="name" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="editProvider">AI 服务商</label>
+            <select id="editProvider" name="provider">
+              <option value="openai">OpenAI</option>
+              <option value="claude">Claude (Anthropic)</option>
+              <option value="local">本地模型</option>
+            </select>
+          </div>
+          <div class="form-group half">
+            <label for="editModelName">模型名称</label>
+            <input type="text" id="editModelName" name="model_name">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="editApiKey">API 密钥</label>
+          <div class="password-input-group">
+            <input type="password" id="editApiKey" name="api_key" placeholder="留空保持不变">
+            <button type="button" class="btn password-toggle" onclick="togglePasswordVisibility('editApiKey')" title="显示/隐藏密钥">
+              <i class="fas fa-eye" id="editApiKey-icon"></i>
+            </button>
+          </div>
+          <small class="form-help">留空保持原有密钥不变，填写新密钥将替换原有密钥</small>
+        </div>
+
+        <div class="form-group">
+          <label for="editApiUrl">API 地址（可选）</label>
+          <input type="text" id="editApiUrl" name="api_url" placeholder="请输入API地址">
+          <small class="form-help">留空使用服务商默认地址</small>
+        </div>
+
+  
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="editTemperature">Temperature (0-1)</label>
+            <input type="number" id="editTemperature" name="temperature" min="0" max="1" step="0.1">
+          </div>
+          <div class="form-group half">
+            <label for="editMaxTokens">最大 Token 数</label>
+            <input type="number" id="editMaxTokens" name="max_tokens" min="100">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="editIsActive" name="is_active">
+            <span>设为活跃配置</span>
+          </label>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn ghost" onclick="hideEditConfigModal()">取消</button>
+      <button class="btn primary" onclick="updateConfig()">更新配置</button>
+    </div>
+  </div>
+</div>
+
+<!-- 删除确认模态框已移除 - 现在直接删除 -->
+
+<style>
+/* AI配置页面特定样式 */
+.configs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.config-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.config-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px var(--shadow-hover);
+}
+
+.config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+
+.config-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fg);
+  margin: 0;
+}
+
+.config-status {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.config-status.active {
+  background: var(--success);
+  color: var(--text-on-success);
+}
+
+.config-status.inactive {
+  background: var(--muted);
+  color: var(--text-on-primary);
+}
+
+.config-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+
+.config-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.config-label {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.config-value {
+  color: var(--fg);
+  font-weight: 400;
+}
+
+.config-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+.config-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.config-actions .btn {
+  flex: 1;
+  min-width: 80px;
+  justify-content: center;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+
+.empty-state i {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state h3 {
+  margin: 0 0 8px 0;
+  color: var(--fg);
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 16px;
+}
+
+/* 模态框样式 */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: var(--bg);
+  border-radius: var(--radius-lg);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.btn-close:hover {
+  color: var(--fg);
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 16px 24px 24px;
+  border-top: 1px solid var(--border);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-group.half {
+  grid-column: span 1;
+}
+
+.required {
+  color: var(--error);
+}
+
+.form-help {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.checkbox-label input[type="checkbox"] {
+  margin: 0;
+}
+
+/* 密码输入框组样式 */
+.password-input-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.password-input-group input {
+  flex: 1;
+}
+
+.password-toggle {
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--fg);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+}
+
+.password-toggle:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent);
+}
+
+.password-toggle:active {
+  transform: scale(0.95);
+}
+
+@media (max-width: 768px) {
+  .configs-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-content {
+    margin: 0;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .config-actions {
+    flex-direction: column;
+  }
+}
+</style>
+
+<script>
+// 版本控制 - 强制刷新缓存
+console.log('🔧 AI配置页面已加载 - v20251108-4 (直接删除版)');
+
+let configs = [];
+let deleteConfigId = null;
+
+// Toast 通知函数
+function showToast(message, type = 'info') {
+  console.log(`🔔 [${type.toUpperCase()}] ${message}`);
+
+  // 创建简单的通知元素
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 20px;
+    background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+    color: white;
+    border-radius: 8px;
+    z-index: 10000;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: slideIn 0.3s ease;
+  `;
+  toast.textContent = message;
+
+  // 添加动画样式
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  document.body.appendChild(toast);
+
+  // 3秒后自动移除
+  setTimeout(() => {
+    toast.style.animation = 'slideOut 0.3s ease';
+    setTimeout(() => {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 300);
+  }, 3000);
+}
+
+// 切换密码显示/隐藏
+function togglePasswordVisibility(inputId) {
+  const input = document.getElementById(inputId);
+  const icon = document.getElementById(inputId + '-icon');
+
+  if (input && icon) {
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.classList.remove('fa-eye');
+      icon.classList.add('fa-eye-slash');
+    } else {
+      input.type = 'password';
+      icon.classList.remove('fa-eye-slash');
+      icon.classList.add('fa-eye');
+    }
+  }
+}
+
+// 页面加载时获取配置列表
+document.addEventListener('DOMContentLoaded', function() {
+  loadConfigs();
+});
+
+// 加载配置列表
+async function loadConfigs() {
+  console.log('🔄 开始加载配置列表...');
+  try {
+    const response = await fetch('/api/ai-configs');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    configs = await response.json();
+    console.log('📋 配置列表加载完成:', configs);
+    renderConfigs();
+    console.log('✅ 配置列表渲染完成');
+  } catch (error) {
+    console.error('❌ 加载配置失败:', error);
+    showToast('加载配置失败', 'error');
+  }
+}
+
+// 渲染配置列表
+function renderConfigs() {
+  const container = document.getElementById('configsList');
+  console.log('🎨 开始渲染配置列表，配置数量:', configs.length);
+
+  if (configs.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <i class="fas fa-robot"></i>
+        <h3>暂无 AI 配置</h3>
+        <p>请添加一个配置开始使用AI优化功能</p>
+      </div>
+    `;
+    console.log('✅ 渲染空状态完成');
+    return;
+  }
+
+  const configsHtml = configs.map(config => `
+    <div class="config-card">
+      <div class="config-header">
+        <h3 class="config-title">${config.name}</h3>
+        <span class="config-status ${config.is_active ? 'active' : 'inactive'}">
+          ${config.is_active ? '活跃' : '未激活'}
+        </span>
+      </div>
+
+      <div class="config-info">
+        <div class="config-info-item">
+          <span class="config-label">服务商:</span>
+          <span class="config-value">${config.provider.toUpperCase()}</span>
+        </div>
+        <div class="config-info-item">
+          <span class="config-label">模型:</span>
+          <span class="config-value">${config.model_name}</span>
+        </div>
+        <div class="config-info-item">
+          <span class="config-label">Temperature:</span>
+          <span class="config-value">${config.temperature}</span>
+        </div>
+        <div class="config-info-item">
+          <span class="config-label">最大Tokens:</span>
+          <span class="config-value">${config.max_tokens}</span>
+        </div>
+      </div>
+
+      <div class="config-meta">
+        创建时间: ${new Date(config.created_at).toLocaleString()}
+      </div>
+
+      <div class="config-actions">
+        <button class="btn ghost" onclick="testConfig(${config.id})">
+          <i class="fas fa-plug"></i> 测试
+        </button>
+        <button class="btn ghost" onclick="editConfig(${config.id})">
+          <i class="fas fa-edit"></i> 编辑
+        </button>
+        <button class="btn danger" onclick="deleteConfig(${config.id})">
+          <i class="fas fa-trash"></i> 删除
+        </button>
+      </div>
+    </div>
+  `).join('');
+
+  container.innerHTML = configsHtml;
+  console.log('✅ 配置列表渲染完成，实际DOM元素数量:', container.children.length);
+}
+
+// 显示添加配置模态框
+function showAddConfigModal() {
+  document.getElementById('addConfigModal').style.display = 'flex';
+  document.getElementById('addConfigForm').reset();
+}
+
+// 隐藏添加配置模态框
+function hideAddConfigModal() {
+  document.getElementById('addConfigModal').style.display = 'none';
+}
+
+// 显示编辑配置模态框
+function showEditConfigModal() {
+  console.log('显示编辑模态框');
+  const modal = document.getElementById('editConfigModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    console.log('模态框已显示');
+  } else {
+    console.log('未找到模态框元素');
+  }
+}
+
+// 隐藏编辑配置模态框
+function hideEditConfigModal() {
+  console.log('关闭编辑模态框');
+  const modal = document.getElementById('editConfigModal');
+  if (modal) {
+    modal.style.display = 'none';
+    console.log('模态框已关闭');
+  } else {
+    console.log('未找到模态框元素');
+  }
+}
+
+// 显示删除确认模态框
+// 删除确认模态框函数已移除 - 现在直接删除
+
+// 保存配置
+async function saveConfig() {
+  const form = document.getElementById('addConfigForm');
+  const formData = new FormData(form);
+
+  const data = {
+    name: formData.get('name'),
+    provider: formData.get('provider') || 'openai',
+    model_name: formData.get('model_name') || 'gpt-4',  // 添加默认值
+    api_key: formData.get('api_key'),
+    api_url: formData.get('api_url') || null,
+    temperature: parseFloat(formData.get('temperature')) || 0.7,  // 添加默认值
+    max_tokens: parseInt(formData.get('max_tokens')) || 2000,  // 添加默认值
+    is_active: formData.has('is_active') ? 1 : 0
+  };
+
+  if (!data.name) {
+    showToast('请输入配置名称', 'error');
+    return;
+  }
+
+  if (!data.api_key) {
+    showToast('请输入API密钥', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/ai-configs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      showToast('配置创建成功', 'success');
+      hideAddConfigModal();
+      form.reset();
+      loadConfigs();
+    } else {
+      const error = await response.json();
+      showToast(error.error || '创建配置失败', 'error');
+    }
+  } catch (error) {
+    console.error('创建配置失败:', error);
+    showToast('创建配置失败', 'error');
+  }
+}
+
+// 编辑配置
+function editConfig(configId) {
+  console.log('编辑配置ID:', configId);
+  const config = configs.find(c => c.id === configId);
+  if (!config) {
+    console.log('未找到配置');
+    return;
+  }
+
+  console.log('配置数据:', config);
+
+  document.getElementById('editConfigId').value = config.id;
+  document.getElementById('editConfigName').value = config.name || '';
+  document.getElementById('editProvider').value = config.provider || 'openai';
+  document.getElementById('editModelName').value = config.model_name || 'gpt-4';
+  document.getElementById('editApiUrl').value = config.api_url || '';
+  document.getElementById('editTemperature').value = config.temperature || 0.7;
+  document.getElementById('editMaxTokens').value = config.max_tokens || 2000;
+  document.getElementById('editIsActive').checked = config.is_active === 1;
+  // API密钥字段不填充，让用户选择是否更新
+
+  console.log('表单已填充，显示模态框');
+  showEditConfigModal();
+}
+
+// 更新配置
+async function updateConfig() {
+  console.log('=== 开始更新配置 ===');
+  const configId = document.getElementById('editConfigId').value;
+  console.log('配置ID:', configId);
+
+  if (!configId) {
+    console.error('配置ID为空');
+    showToast('配置ID无效', 'error');
+    return;
+  }
+
+  const form = document.getElementById('editConfigForm');
+  if (!form) {
+    console.error('未找到编辑表单');
+    showToast('表单错误', 'error');
+    return;
+  }
+
+  const formData = new FormData(form);
+  const formDataObj = Object.fromEntries(formData);
+  console.log('表单数据:', formDataObj);
+
+  // 修复API地址处理逻辑
+  const apiUrlValue = formData.get('api_url');
+  const data = {
+    name: formData.get('name'),
+    provider: formData.get('provider') || 'openai',
+    model_name: formData.get('model_name') || 'gpt-4',  // 添加默认值
+    api_key: formData.get('api_key') || undefined,
+    api_url: apiUrlValue && apiUrlValue.trim() !== '' ? apiUrlValue.trim() : null,
+    temperature: parseFloat(formData.get('temperature')) || 0.7,  // 添加默认值
+    max_tokens: parseInt(formData.get('max_tokens')) || 2000,  // 添加默认值
+    is_active: formData.has('is_active') ? 1 : 0
+  };
+
+  console.log('准备发送的数据:', data);
+
+  if (!data.name) {
+    showToast('请输入配置名称', 'error');
+    return;
+  }
+
+  // 如果API密钥字段为空，则从原有配置中保持不变
+  if (!data.api_key) {
+    delete data.api_key; // 删除字段，后端会保持原有值
+  }
+
+  try {
+    console.log('🚀 发送API请求...');
+    const response = await fetch(`/api/ai-configs/${configId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data)
+    });
+
+    console.log('📡 API响应状态:', response.status);
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ 更新API响应成功:', result);
+      showToast('配置更新成功', 'success');
+
+      // 成功后关闭模态框
+      console.log('📦 隐藏编辑模态框...');
+      hideEditConfigModal();
+
+      // 然后重新加载数据
+      console.log('🔄 重新加载配置列表...');
+      await loadConfigs();
+
+      console.log('✅ 更新流程完成');
+    } else if (response.status === 404) {
+      showToast('配置不存在，正在刷新列表...', 'warning');
+      hideEditConfigModal();
+      await loadConfigs();
+    } else if (response.status === 403) {
+      const error = await response.json();
+      console.error('❌ 权限错误:', error);
+      showToast('无权限更新此配置', 'error');
+      // 权限错误时不关闭模态框，让用户检查权限
+    } else {
+      const error = await response.json();
+      console.error('❌ API错误响应:', error);
+      showToast(error.error || '更新配置失败', 'error');
+
+      // 如果更新失败，重新显示模态框让用户修改
+      console.log('🔄 重新显示编辑模态框...');
+      showEditConfigModal();
+    }
+  } catch (error) {
+    console.error('❌ 更新配置异常:', error);
+    showToast('网络错误，请检查连接', 'error');
+
+    // 网络错误时也重新显示模态框
+    console.log('🔄 重新显示编辑模态框...');
+    showEditConfigModal();
+  }
+}
+
+// 测试配置
+async function testConfig(configId) {
+  try {
+    showToast('正在测试连接...', 'info');
+
+    const response = await fetch(`/api/ai-configs/${configId}/test`, {
+      method: 'POST'
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      showToast('连接测试成功！', 'success');
+    } else {
+      showToast(result.error || '连接测试失败', 'error');
+    }
+  } catch (error) {
+    console.error('测试连接失败:', error);
+    showToast('测试连接失败', 'error');
+  }
+}
+
+// 删除配置 - 恢复确认机制
+async function deleteConfig(configId) {
+  const config = configs.find(c => c.id === configId);
+  const configName = config ? config.name : '此配置';
+
+  console.log('🗑️ 确认删除配置:', configName, '(ID:', configId + ')');
+
+  // 恢复确认步骤 - 与主页面保持一致
+  if (!confirm(`确定要删除配置"${configName}"吗？此操作不可恢复。`)) {
+    console.log('❌ 用户取消删除');
+    return;
+  }
+
+  console.log('🚀 用户确认删除，开始执行...');
+
+  try {
+    const response = await fetch(`/api/ai-configs/${configId}`, {
+      method: 'DELETE'
+    });
+
+    console.log('📡 删除响应状态:', response.status);
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ 删除成功:', result);
+      showToast('配置删除成功', 'success');
+
+      // 优先重新加载数据，确保一致性（遵循项目原本逻辑）
+      await loadConfigs();
+
+    } else if (response.status === 404) {
+      showToast('配置不存在，正在刷新列表...', 'warning');
+      await loadConfigs();
+    } else if (response.status === 403) {
+      showToast('无权限删除此配置', 'error');
+    } else {
+      const error = await response.json();
+      console.error('❌ 删除失败:', error);
+      showToast(error.error || '删除配置失败', 'error');
+    }
+  } catch (error) {
+    console.error('❌ 删除配置失败:', error);
+    showToast('网络错误，请检查连接', 'error');
+  }
+}
+
+// 点击模态框背景关闭
+document.getElementById('addConfigModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    hideAddConfigModal();
+  }
+});
+
+document.getElementById('editConfigModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    hideEditConfigModal();
+  }
+});
+
+// 删除模态框事件监听器已移除 - 现在直接删除
+</script>
+{% endblock %}

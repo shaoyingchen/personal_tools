@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="{{ lang_html }}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark">
+  <!-- Enhanced mobile optimization -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="{{ t('Prompt 管理器') }}">
+  <!-- Mobile status bar colors for auto mode (follow OS) -->
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0b0f" media="(prefers-color-scheme: dark)">
+  <!-- PWA manifest -->
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <!-- Better favicon -->
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
+  <!-- Preload critical resources -->
+  <link rel="preload" href="{{ url_for('static', filename='css/style.css') }}" as="style">
+  <link rel="preload" href="{{ url_for('static', filename='js/main.js') }}" as="script">
+  <title>{% block title %}{{ t('Prompt 管理器') }}{% endblock %}</title>
+  <script>
+    // Apply saved manual theme ASAP to avoid flash; otherwise follow system
+    (function() {
+      try {
+        var saved = localStorage.getItem('theme'); // 'light' | 'dark' | null(自动)
+        if (saved === 'light' || saved === 'dark') {
+          document.documentElement.setAttribute('data-theme', saved);
+          window.__THEME__ = saved;
+        } else {
+          // 自动模式：不设置 data-theme，由 CSS + prefers-color-scheme 控制
+          document.documentElement.removeAttribute('data-theme');
+          window.__THEME__ = 'auto';
+        }
+      } catch (e) {
+        // Fallback to auto if localStorage unavailable
+        document.documentElement.removeAttribute('data-theme');
+        window.__THEME__ = 'auto';
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=20251109-1550" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <style>
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .brand .btn.ghost {
+      padding: 8px 12px;
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a href="{{ url_for('index') }}" class="btn ghost" aria-label="{{ t('提示词管理') }}">
+        <i class="fas fa-folder-open"></i>
+        <span class="nav-text">{{ t('提示词管理') }}</span>
+      </a>
+      <a href="{{ url_for('toolbox') }}" class="btn ghost" aria-label="工具箱">
+        <i class="fas fa-toolbox"></i>
+        <span class="nav-text">工具箱</span>
+      </a>
+    </div>
+    <nav class="nav">
+      <a href="{{ url_for('ai_configs') }}" class="btn ghost" title="AI 配置管理" aria-label="AI 配置管理">🤖 <span class="nav-text">{{ t('AI配置') }}</span></a>
+      <a href="{{ url_for('settings') }}" class="btn ghost" aria-label="{{ t('设置') }}">{{ t('设置') }}</a>
+      <button id="themeToggle" class="btn ghost" title="{{ t('切换主题') }}" aria-label="{{ t('切换主题') }}">🌓</button>
+    </nav>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-wrap">
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ t(message) }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>window.APP_LANG = '{{ lang }}';</script>
+  <script src="{{ url_for('static', filename='js/main.js') }}?v=20251108-4"></script>
+</body>
+</html>
