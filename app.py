@@ -908,7 +908,7 @@ def prompt_detail(prompt_id):
         versions = conn.execute("SELECT * FROM versions WHERE prompt_id=? ORDER BY created_at DESC",
                                 (prompt_id,)).fetchall()
         current = conn.execute("SELECT * FROM versions WHERE id=?", (prompt['current_version_id'],)).fetchone() if \
-        prompt['current_version_id'] else None
+            prompt['current_version_id'] else None
 
         return render_template('prompt_detail.html', prompt=prompt, versions=versions, current=current,
                                auth_mode=auth_mode)
@@ -1010,6 +1010,67 @@ def jasypt_decrypt_route():
 
         decrypted = JasyptEncryptor.decrypt_with_config(encrypted_text, password)
         return jsonify({'result': decrypted})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/generate-data', methods=['POST'])
+def generate_data():
+    try:
+        data = request.get_json()
+        create_table_statement = data.get('create_table_statement', '')
+        database_type = data.get('database_type', 'mysql')
+        record_count = data.get('record_count', 10)
+
+        if not create_table_statement:
+            return jsonify({'error': '建表语句不能为空'}), 400
+
+        # 从数据库中获取第一个AI配置
+        with get_db() as conn:
+            config = conn.execute('SELECT * FROM ai_configs ORDER BY id ASC LIMIT 1').fetchone()
+            if not config:
+                # 如果没有配置，使用默认配置
+                ai_config = {
+                    'provider': 'openai',
+                    'api_key': os.environ.get('OPENAI_API_KEY', ''),
+                    'model_name': 'gpt-4',
+                    'system_prompt': '你是一个数据库专家，能够根据建表语句生成相应的测试数据INSERT语句。请只返回INSERT语句，不要包含其他解释文字。'
+                }
+            else:
+                # 使用数据库中的配置
+                ai_config = {
+                    'provider': config['provider'],
+                    'api_key': config['api_key'] if config['api_key'] else os.environ.get('OPENAI_API_KEY', ''),
+                    'model_name': config['model_name'],
+                    'api_url': config['api_url'],
+                    'system_prompt': '你是一个数据库专家，能够根据建表语句生成相应的测试数据INSERT语句。请只返回INSERT语句，不要包含其他解释文字。',
+                    'temperature': config['temperature'],
+                    'max_tokens': config['max_tokens']
+                }
+                # 解密API密钥
+                if ai_config['api_key']:
+                    ai_config['api_key'] = decrypt_api_key(ai_config['api_key'])
+
+        ai_service = create_ai_service(ai_config)
+
+        prompt = f"""
+        根据以下建表语句生成{record_count}条测试数据INSERT语句：
+
+        数据库类型: {database_type}
+        建表语句:
+        {create_table_statement}
+
+        要求：
+        1. 生成{record_count}条INSERT语句
+        2. 根据字段类型生成合理的测试数据（如姓名、邮箱、日期等）
+        3. 字符串类型使用英文测试数据
+        4. 只返回INSERT语句，不要包含其他解释文字
+        5. 使用适当的随机数据填充所有字段
+        """
+
+        insert_statements = ai_service.api_call(prompt)
+
+        return jsonify({'insert_statements': insert_statements})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1333,7 +1394,7 @@ def versions_page(prompt_id):
         versions_dict = [dict(version) for version in versions]
 
         current = conn.execute("SELECT * FROM versions WHERE id=?", (prompt['current_version_id'],)).fetchone() if \
-        prompt['current_version_id'] else None
+            prompt['current_version_id'] else None
         current_dict = dict(current) if current else None
 
         prompt_dict = dict(prompt)
@@ -1487,6 +1548,37 @@ class OpenAIService(AIService):
             }
 
             response = requests.post(self.api_url, headers=headers, json=data, timeout=30)
+
+            if response.status_code == 200:
+                result = response.json()
+                return result['choices'][0]['message']['content'].strip()
+            else:
+                raise Exception(f"API 请求失败: {response.status_code} - {response.text}")
+
+        except Exception as e:
+            raise Exception(f"OpenAI 服务错误: {str(e)}")
+
+    def api_call(self, original_prompt):
+        """调用API"""
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+
+            messages = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": f"{original_prompt}"}
+            ]
+
+            data = {
+                "model": self.model_name,
+                "messages": messages,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens
+            }
+
+            response = requests.post(self.api_url, headers=headers, json=data, timeout=60)
 
             if response.status_code == 200:
                 result = response.json()

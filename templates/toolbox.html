@@ -239,6 +239,75 @@
     header.topbar .nav a {
         color: var(--fg);
     }
+    
+    .copy-button {
+        position: absolute;
+        right: 10px;
+        top: 10px;
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+    
+    .copy-button:hover {
+        background: #5a67d8;
+    }
+    
+    .result-container {
+        position: relative;
+        margin-top: 20px;
+    }
+    
+    /* 添加全屏加载遮罩样式 */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        display: none;
+    }
+    
+    .loading-content {
+        background: white;
+        padding: 30px;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .loading-spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+    }
+    
+    .loading-text {
+        color: #333;
+        font-size: 16px;
+        margin-top: 10px;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
 </style>
 
 <div class="container">
@@ -302,6 +371,24 @@
             <div class="tool-icon">🔒</div>
             <h3>Jasypt 加解密</h3>
             <p>配置文件加解密工具</p>
+        </div>
+        
+        <div class="tool-card" onclick="showTool('data')">
+            <div class="tool-icon">📊</div>
+            <h3>数据生成器</h3>
+            <p>根据建表语句生成测试数据</p>
+        </div>
+        
+        <div class="tool-card" onclick="showTool('xml')">
+            <div class="tool-icon">📄</div>
+            <h3>XML 工具</h3>
+            <p>格式化、压缩、验证XML数据</p>
+        </div>
+        
+        <div class="tool-card" onclick="showTool('password')">
+            <div class="tool-icon">🔑</div>
+            <h3>密码生成器</h3>
+            <p>生成安全的随机密码</p>
         </div>
     </div>
     
@@ -554,6 +641,119 @@
             <textarea id="jasypt-output" readonly placeholder="结果将显示在这里..."></textarea>
         </div>
     </div>
+    
+    <!-- Data Generator Tool -->
+    <div id="data-workspace" class="workspace">
+        <div class="workspace-header">
+            <h2>📊 数据生成器</h2>
+            <div>
+                <button class="btn" onclick="generateData()">生成数据</button>
+                <button class="btn btn-secondary" onclick="copyInsertStatements()">复制INSERT语句</button>
+                <button class="btn btn-danger" onclick="clearDataGenerator()">清空</button>
+            </div>
+        </div>
+        <div id="data-alert"></div>
+        
+        <div class="input-group">
+            <label>数据库类型：</label>
+            <select id="database-type">
+                <option value="mysql">MySQL</option>
+                <option value="postgresql">PostgreSQL</option>
+                <option value="sqlite">SQLite</option>
+                <option value="oracle">Oracle</option>
+                <option value="sqlserver">SQL Server</option>
+            </select>
+        </div>
+        
+        <div class="input-group">
+            <label>建表语句：</label>
+            <textarea id="create-table-statement" placeholder="请输入建表语句，例如：
+CREATE TABLE users (
+    id INT PRIMARY KEY,
+    name VARCHAR(50),
+    email VARCHAR(100),
+    age INT,
+    created_at TIMESTAMP
+);"></textarea>
+        </div>
+        
+        <div class="input-group">
+            <label>生成记录数：</label>
+            <input type="number" id="record-count" value="10" min="1" max="1000">
+        </div>
+        
+        <div class="result-container">
+            <label>生成结果（INSERT语句）：</label>
+            <button class="copy-button" onclick="copyInsertStatements()">复制</button>
+            <textarea id="data-output" readonly placeholder="生成的INSERT语句将显示在这里..."></textarea>
+        </div>
+    </div>
+    
+    <!-- XML Tool -->
+    <div id="xml-workspace" class="workspace">
+        <div class="workspace-header">
+            <h2>📄 XML 工具</h2>
+            <div>
+                <button class="btn" onclick="formatXML()">格式化</button>
+                <button class="btn btn-secondary" onclick="compressXML()">压缩</button>
+                <button class="btn btn-success" onclick="validateXML()">验证</button>
+                <button class="btn btn-danger" onclick="clearXML()">清空</button>
+            </div>
+        </div>
+        <div id="xml-alert"></div>
+        <textarea id="xml-input" placeholder="在此输入或粘贴XML数据..."></textarea>
+    </div>
+    
+    <!-- Password Generator Tool -->
+    <div id="password-workspace" class="workspace">
+        <div class="workspace-header">
+            <h2>🔑 随机密码生成器</h2>
+            <div>
+                <button class="btn" onclick="generatePassword()">生成密码</button>
+                <button class="btn btn-secondary" onclick="copyPassword()">复制密码</button>
+                <button class="btn btn-danger" onclick="clearPassword()">清空</button>
+            </div>
+        </div>
+        <div id="password-alert"></div>
+        
+        <div class="input-group">
+            <label>密码长度：</label>
+            <input type="number" id="password-length" value="12" min="4" max="128">
+        </div>
+        
+        <div class="input-group">
+            <label>密码选项：</label>
+            <div>
+                <input type="checkbox" id="include-uppercase" checked>
+                <label for="include-uppercase">包含大写字母 (A-Z)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="include-lowercase" checked>
+                <label for="include-lowercase">包含小写字母 (a-z)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="include-numbers" checked>
+                <label for="include-numbers">包含数字 (0-9)</label>
+            </div>
+            <div>
+                <input type="checkbox" id="include-symbols" checked>
+                <label for="include-symbols">包含特殊字符 (!@#$%^&*)</label>
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <label>生成的密码：</label>
+            <div class="result-box" id="password-result" style="word-break: break-all; font-size: 1.2em; font-weight: bold;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 全屏加载遮罩 -->
+<div class="loading-overlay" id="data-loading-overlay">
+    <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">数据生成中，请稍候...</div>
+    </div>
 </div>
 
 <script>
@@ -567,8 +767,17 @@
         const workspace = document.getElementById(toolName + '-workspace');
         if (workspace) {
             workspace.classList.add('active');
-            event.currentTarget.classList.add('active');
         }
+        
+        // 设置选中工具卡片的active状态
+        const toolCards = document.querySelectorAll('.tool-card');
+        toolCards.forEach(card => {
+            // 通过onclick属性来判断是否是当前选中的工具
+            const onclickAttr = card.getAttribute('onclick');
+            if (onclickAttr && onclickAttr.includes("'" + toolName + "'")) {
+                card.classList.add('active');
+            }
+        });
         
         // 特殊初始化
         if (toolName === 'timestamp') {
@@ -578,565 +787,6 @@
         if (toolName === 'color') {
             updateColorValues();
         }
-    }
-    
-    // ========== JSON 工具 ==========
-    function showAlert(elementId, message, type) {
-        const alertBox = document.getElementById(elementId);
-        alertBox.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
-        setTimeout(() => alertBox.innerHTML = '', 3000);
-    }
-    
-    function formatJSON() {
-        const input = document.getElementById('json-input').value.trim();
-        if (!input) {
-            showAlert('json-alert', '请输入JSON数据', 'error');
-            return;
-        }
-        
-        try {
-            const parsed = JSON.parse(input);
-            document.getElementById('json-input').value = JSON.stringify(parsed, null, 4);
-            showAlert('json-alert', '格式化成功！', 'success');
-        } catch (e) {
-            showAlert('json-alert', 'JSON格式错误: ' + e.message, 'error');
-        }
-    }
-    
-    function compressJSON() {
-        const input = document.getElementById('json-input').value.trim();
-        if (!input) {
-            showAlert('json-alert', '请输入JSON数据', 'error');
-            return;
-        }
-        
-        try {
-            const parsed = JSON.parse(input);
-            document.getElementById('json-input').value = JSON.stringify(parsed);
-            showAlert('json-alert', '压缩成功！', 'success');
-        } catch (e) {
-            showAlert('json-alert', 'JSON格式错误: ' + e.message, 'error');
-        }
-    }
-    
-    function validateJSON() {
-        const input = document.getElementById('json-input').value.trim();
-        if (!input) {
-            showAlert('json-alert', '请输入JSON数据', 'error');
-            return;
-        }
-        
-        try {
-            JSON.parse(input);
-            showAlert('json-alert', '✅ JSON格式正确！', 'success');
-        } catch (e) {
-            showAlert('json-alert', '❌ JSON格式错误: ' + e.message, 'error');
-        }
-    }
-    
-    function clearJSON() {
-        document.getElementById('json-input').value = '';
-        document.getElementById('json-alert').innerHTML = '';
-    }
-    
-    // ========== Cron 工具 ==========
-    function applyCronPreset() {
-        const preset = document.getElementById('cron-preset').value;
-        if (!preset) return;
-        
-        const parts = preset.split(' ');
-        document.getElementById('cron-minute').value = parts[0];
-        document.getElementById('cron-hour').value = parts[1];
-        document.getElementById('cron-day').value = parts[2];
-        document.getElementById('cron-month').value = parts[3];
-        document.getElementById('cron-week').value = parts[4];
-        
-        generateCron();
-    }
-    
-    function generateCron() {
-        const minute = document.getElementById('cron-minute').value || '*';
-        const hour = document.getElementById('cron-hour').value || '*';
-        const day = document.getElementById('cron-day').value || '*';
-        const month = document.getElementById('cron-month').value || '*';
-        const week = document.getElementById('cron-week').value || '*';
-        
-        const expression = `${minute} ${hour} ${day} ${month} ${week}`;
-        
-        document.getElementById('cron-expression').textContent = expression;
-        document.getElementById('cron-description').textContent = describeCron(expression);
-        document.getElementById('cron-result').style.display = 'block';
-        
-        // 生成接下来的执行时间（简化版）
-        generateNextRuns(minute, hour, day, month, week);
-    }
-    
-    function describeCron(expression) {
-        const parts = expression.split(' ');
-        const [min, hr, d, mon, wk] = parts;
-        
-        let desc = '执行时间：';
-        
-        if (expression === '* * * * *') return '每分钟执行一次';
-        if (expression === '0 * * * *') return '每小时的第0分钟执行';
-        if (expression === '0 0 * * *') return '每天凌晨00:00执行';
-        if (expression === '0 0 * * 0') return '每周日凌晨00:00执行';
-        if (expression === '0 0 1 * *') return '每月1号凌晨00:00执行';
-        if (expression === '0 9 * * 1-5') return '每周一到周五上午09:00执行';
-        
-        // 分钟
-        if (min === '*') desc += '每分钟';
-        else if (min.includes('/')) desc += `每${min.split('/')[1]}分钟`;
-        else desc += `第${min}分钟`;
-        
-        // 小时
-        if (hr === '*') desc += '，每小时';
-        else if (hr.includes('/')) desc += `，每${hr.split('/')[1]}小时`;
-        else desc += `，${hr}点`;
-        
-        // 日期
-        if (d !== '*') desc += `，${d}号`;
-        
-        // 月份
-        if (mon !== '*') desc += `，${mon}月`;
-        
-        // 星期
-        if (wk !== '*') {
-            const weekNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-            if (wk.includes('-')) {
-                const [start, end] = wk.split('-');
-                desc += `，${weekNames[start]}到${weekNames[end]}`;
-            } else {
-                desc += `，${weekNames[wk]}`;
-            }
-        }
-        
-        return desc;
-    }
-    
-    function generateNextRuns(min, hr, d, mon, wk) {
-        const nextRuns = document.getElementById('next-runs');
-        nextRuns.innerHTML = '';
-        
-        const now = new Date();
-        let count = 0;
-        let current = new Date(now);
-        
-        // 简化版：仅展示基本情况
-        if (min === '*' && hr === '*') {
-            // 每分钟
-            for (let i = 0; i < 5; i++) {
-                current = new Date(now.getTime() + (i + 1) * 60000);
-                nextRuns.innerHTML += `<li>${formatDate(current)}</li>`;
-            }
-        } else if (min.startsWith('*/')) {
-            // 每N分钟
-            const interval = parseInt(min.split('/')[1]);
-            for (let i = 0; i < 5; i++) {
-                current = new Date(now.getTime() + (i + 1) * interval * 60000);
-                nextRuns.innerHTML += `<li>${formatDate(current)}</li>`;
-            }
-        } else {
-            // 固定时间
-            for (let i = 1; i <= 5; i++) {
-                current = new Date(now);
-                current.setDate(now.getDate() + i);
-                if (hr !== '*') current.setHours(parseInt(hr) || 0);
-                if (min !== '*') current.setMinutes(parseInt(min) || 0);
-                current.setSeconds(0);
-                nextRuns.innerHTML += `<li>${formatDate(current)}</li>`;
-            }
-        }
-    }
-    
-    function formatDate(date) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        const hour = String(date.getHours()).padStart(2, '0');
-        const minute = String(date.getMinutes()).padStart(2, '0');
-        const second = String(date.getSeconds()).padStart(2, '0');
-        
-        const weekNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-        const weekDay = weekNames[date.getDay()];
-        
-        return `${year}-${month}-${day} ${hour}:${minute}:${second} ${weekDay}`;
-    }
-    
-    // ========== Base64 工具 ==========
-    function encodeBase64() {
-        const input = document.getElementById('base64-input').value;
-        if (!input) {
-            showAlert('base64-alert', '请输入要编码的文本', 'error');
-            return;
-        }
-        
-        try {
-            const encoded = btoa(unescape(encodeURIComponent(input)));
-            document.getElementById('base64-output').value = encoded;
-            showAlert('base64-alert', '编码成功！', 'success');
-        } catch (e) {
-            showAlert('base64-alert', '编码失败: ' + e.message, 'error');
-        }
-    }
-    
-    function decodeBase64() {
-        const input = document.getElementById('base64-input').value.trim();
-        if (!input) {
-            showAlert('base64-alert', '请输入要解码的Base64字符串', 'error');
-            return;
-        }
-        
-        try {
-            const decoded = decodeURIComponent(escape(atob(input)));
-            document.getElementById('base64-output').value = decoded;
-            showAlert('base64-alert', '解码成功！', 'success');
-        } catch (e) {
-            showAlert('base64-alert', '解码失败: ' + e.message, 'error');
-        }
-    }
-    
-    function clearBase64() {
-        document.getElementById('base64-input').value = '';
-        document.getElementById('base64-output').value = '';
-        document.getElementById('base64-alert').innerHTML = '';
-    }
-    
-    // ========== 时间戳工具 ==========
-    function updateCurrentTimestamp() {
-        const now = Date.now();
-        document.getElementById('current-timestamp').textContent = now + ' ms (' + Math.floor(now / 1000) + ' s)';
-    }
-    
-    function timestampToDate() {
-        const input = document.getElementById('ts-to-date-input').value.trim();
-        if (!input) {
-            document.getElementById('ts-to-date-result').textContent = '请输入时间戳';
-            return;
-        }
-        
-        let timestamp = parseInt(input);
-        // 如果是秒级时间戳，转换为毫秒
-        if (timestamp < 10000000000) {
-            timestamp = timestamp * 1000;
-        }
-        
-        const date = new Date(timestamp);
-        document.getElementById('ts-to-date-result').innerHTML = `
-            <strong>本地时间：</strong><br>
-            ${formatDate(date)}<br><br>
-            <strong>ISO 格式：</strong><br>
-            ${date.toISOString()}<br><br>
-            <strong>UTC 时间：</strong><br>
-            ${date.toUTCString()}
-        `;
-    }
-    
-    function dateToTimestamp() {
-        const input = document.getElementById('date-to-ts-input').value;
-        if (!input) {
-            document.getElementById('date-to-ts-result').textContent = '请选择日期时间';
-            return;
-        }
-        
-        const date = new Date(input);
-        const timestamp = date.getTime();
-        
-        document.getElementById('date-to-ts-result').innerHTML = `
-            <strong>毫秒时间戳：</strong><br>
-            ${timestamp} ms<br><br>
-            <strong>秒时间戳：</strong><br>
-            ${Math.floor(timestamp / 1000)} s
-        `;
-    }
-    
-    // ========== URL 工具 ==========
-    function encodeURL() {
-        const input = document.getElementById('url-input').value;
-        if (!input) {
-            showAlert('url-alert', '请输入要编码的URL', 'error');
-            return;
-        }
-        
-        try {
-            const encoded = encodeURIComponent(input);
-            document.getElementById('url-output').value = encoded;
-            showAlert('url-alert', '编码成功！', 'success');
-        } catch (e) {
-            showAlert('url-alert', '编码失败: ' + e.message, 'error');
-        }
-    }
-    
-    function decodeURL() {
-        const input = document.getElementById('url-input').value.trim();
-        if (!input) {
-            showAlert('url-alert', '请输入要解码的URL', 'error');
-            return;
-        }
-        
-        try {
-            const decoded = decodeURIComponent(input);
-            document.getElementById('url-output').value = decoded;
-            showAlert('url-alert', '解码成功！', 'success');
-        } catch (e) {
-            showAlert('url-alert', '解码失败: ' + e.message, 'error');
-        }
-    }
-    
-    function clearURL() {
-        document.getElementById('url-input').value = '';
-        document.getElementById('url-output').value = '';
-        document.getElementById('url-alert').innerHTML = '';
-    }
-    
-    // ========== 哈希工具 ==========
-    async function calculateHash() {
-        const input = document.getElementById('hash-input').value;
-        if (!input) {
-            alert('请输入要计算哈希的文本');
-            return;
-        }
-        
-        // MD5 (使用简化版实现)
-        document.getElementById('hash-md5').textContent = simpleMD5(input);
-        
-        // SHA-1 和 SHA-256 (使用 Web Crypto API)
-        const encoder = new TextEncoder();
-        const data = encoder.encode(input);
-        
-        const sha1Hash = await crypto.subtle.digest('SHA-1', data);
-        document.getElementById('hash-sha1').textContent = bufferToHex(sha1Hash);
-        
-        const sha256Hash = await crypto.subtle.digest('SHA-256', data);
-        document.getElementById('hash-sha256').textContent = bufferToHex(sha256Hash);
-    }
-    
-    function bufferToHex(buffer) {
-        return Array.from(new Uint8Array(buffer))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-    }
-    
-    function simpleMD5(str) {
-        // 简化版MD5（用于演示，实际项目建议使用专业库）
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            const char = str.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash;
-        }
-        return Math.abs(hash).toString(16).padStart(32, '0');
-    }
-    
-    function clearHash() {
-        document.getElementById('hash-input').value = '';
-        document.getElementById('hash-md5').textContent = '';
-        document.getElementById('hash-sha1').textContent = '';
-        document.getElementById('hash-sha256').textContent = '';
-    }
-    
-    // ========== UUID 工具 ==========
-    function generateUUID() {
-        const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-        document.getElementById('uuid-output').value = uuid;
-    }
-    
-    function generateMultipleUUID() {
-        const count = parseInt(document.getElementById('uuid-count').value) || 10;
-        let uuids = [];
-        
-        for (let i = 0; i < Math.min(count, 100); i++) {
-            const uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                const r = Math.random() * 16 | 0;
-                const v = c === 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-            uuids.push(uuid);
-        }
-        
-        document.getElementById('uuid-output').value = uuids.join('\n');
-    }
-    
-    // ========== 颜色工具 ==========
-    function updateColorValues() {
-        const hex = document.getElementById('color-picker').value;
-        document.getElementById('color-hex').value = hex;
-        
-        const rgb = hexToRgb(hex);
-        document.getElementById('color-rgb').value = `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
-        
-        const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-        document.getElementById('color-hsl').value = `hsl(${Math.round(hsl.h)}, ${Math.round(hsl.s)}%, ${Math.round(hsl.l)}%)`;
-        
-        document.getElementById('color-preview').style.background = hex;
-    }
-    
-    // ========== Jasypt 加解密工具 ==========
-    function showAlert(elementId, message, type) {
-        const alertBox = document.getElementById(elementId);
-        alertBox.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
-        setTimeout(() => alertBox.innerHTML = '', 5000);
-    }
-    
-    // 加密函数
-    async function encryptText() {
-        const password = document.getElementById('jasypt-password').value.trim();
-        const input = document.getElementById('jasypt-input').value;
-        
-        if (!password) {
-            showAlert('jasypt-alert', '请输入密码', 'error');
-            return;
-        }
-        
-        if (!input) {
-            showAlert('jasypt-alert', '请输入要加密的文本', 'error');
-            return;
-        }
-        
-        try {
-            const response = await fetch('/jasypt/encrypt', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    password: password,
-                    text: input
-                })
-            });
-            
-            const result = await response.json();
-            
-            if (response.ok) {
-                document.getElementById('jasypt-output').value = result.result;
-                showAlert('jasypt-alert', '加密成功！', 'success');
-            } else {
-                showAlert('jasypt-alert', '加密失败: ' + result.error, 'error');
-            }
-        } catch (e) {
-            showAlert('jasypt-alert', '加密失败: ' + e.message, 'error');
-        }
-    }
-    
-    // 解密函数
-    async function decryptText() {
-        const password = document.getElementById('jasypt-password').value.trim();
-        const input = document.getElementById('jasypt-input').value.trim();
-        
-        if (!password) {
-            showAlert('jasypt-alert', '请输入密码', 'error');
-            return;
-        }
-        
-        if (!input) {
-            showAlert('jasypt-alert', '请输入要解密的文本', 'error');
-            return;
-        }
-        
-        try {
-            const response = await fetch('/jasypt/decrypt', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    password: password,
-                    encrypted_text: input
-                })
-            });
-            
-            const result = await response.json();
-            
-            if (response.ok) {
-                document.getElementById('jasypt-output').value = result.result;
-                showAlert('jasypt-alert', '解密成功！', 'success');
-            } else {
-                showAlert('jasypt-alert', '解密失败: ' + result.error, 'error');
-            }
-        } catch (e) {
-            showAlert('jasypt-alert', '解密失败: ' + e.message, 'error');
-        }
-    }
-    
-    function clearJasypt() {
-        document.getElementById('jasypt-password').value = '';
-        document.getElementById('jasypt-input').value = '';
-        document.getElementById('jasypt-output').value = '';
-        document.getElementById('jasypt-alert').innerHTML = '';
-    }
-    
-    function convertFromHex() {
-        const hex = document.getElementById('color-hex').value.trim();
-        if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return;
-        
-        document.getElementById('color-picker').value = hex;
-        updateColorValues();
-    }
-    
-    function convertFromRGB() {
-        const rgb = document.getElementById('color-rgb').value.trim();
-        const match = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-        if (!match) return;
-        
-        const r = parseInt(match[1]);
-        const g = parseInt(match[2]);
-        const b = parseInt(match[3]);
-        
-        const hex = rgbToHex(r, g, b);
-        document.getElementById('color-picker').value = hex;
-        document.getElementById('color-hex').value = hex;
-        
-        const hsl = rgbToHsl(r, g, b);
-        document.getElementById('color-hsl').value = `hsl(${Math.round(hsl.h)}, ${Math.round(hsl.s)}%, ${Math.round(hsl.l)}%)`;
-        
-        document.getElementById('color-preview').style.background = hex;
-    }
-    
-    function hexToRgb(hex) {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-        } : null;
-    }
-    
-    function rgbToHex(r, g, b) {
-        return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-    }
-    
-    function rgbToHsl(r, g, b) {
-        r /= 255;
-        g /= 255;
-        b /= 255;
-        
-        const max = Math.max(r, g, b);
-        const min = Math.min(r, g, b);
-        let h, s, l = (max + min) / 2;
-        
-        if (max === min) {
-            h = s = 0;
-        } else {
-            const d = max - min;
-            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-            
-            switch (max) {
-                case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-                case g: h = (b - r) / d + 2; break;
-                case b: h = (r - g) / d + 4; break;
-            }
-            h /= 6;
-        }
-        
-        return {
-            h: h * 360,
-            s: s * 100,
-            l: l * 100
-        };
     }
     
     // 初始化：显示第一个工具
